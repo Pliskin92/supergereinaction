@@ -13,6 +13,7 @@ module.exports = [
         Date: 'readonly',
         Image: 'readonly',
         Promise: 'readonly',
+        fetch: 'readonly',
       },
     },
     rules: {

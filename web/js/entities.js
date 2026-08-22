@@ -39,6 +39,8 @@ class Player {
     this.jumpVy = 0;
     this.grounded = true;
     this.z = 0; // depth offset for jump visual
+    this.animTimer = 0; // frames elapsed in the current action, for sprite-sheet playback
+    this.prevAction = 'idle';
   }
 
   startPunchCombo() {
@@ -158,6 +160,13 @@ class Player {
         this.fury = 0;
       }
     }
+
+    if (this.action !== this.prevAction) {
+      this.animTimer = 0;
+      this.prevAction = this.action;
+    } else {
+      this.animTimer++;
+    }
   }
 
   getAttackHitbox() {
@@ -170,16 +179,38 @@ class Player {
     return null;
   }
 
-  getSlideFrame() {
-    // moveTimer counts down from PLAYER_SLIDE_DURATION to 0 during a slide;
-    // map elapsed progress onto the 4 real slide-cycle frames from the
-    // texture pack (crouch -> kick -> ground -> recover).
-    const elapsed = PLAYER_SLIDE_DURATION - this.moveTimer;
-    const t = clamp(elapsed / PLAYER_SLIDE_DURATION, 0, 0.999);
-    const frames = typeof PlayerSlideFrames === 'function' ? PlayerSlideFrames() : [];
-    if (frames.length < 4 || !frames.every(Boolean)) return null;
-    const idx = Math.floor(t * 4);
-    return frames[idx];
+  // Maps in-game action states to AutoSprite animation clips (see
+  // GereSpriteSheets in assets.js). 'loop': true plays the clip on a
+  // repeating cycle (idle/walk/run); false plays once and holds the last
+  // frame (attacks/jump/hurt), matching how moveTimer/hitStun already gate
+  // those actions' duration.
+  static ANIM_MAP = {
+    idle: { key: 'idle', loop: true, cycleFrames: 40 },
+    walk: { key: 'walk', loop: true, cycleFrames: 24 },
+    punch1: { key: 'punch', loop: false, holdFrames: PLAYER_COMBO_WINDOW },
+    punch2: { key: 'punch', loop: false, holdFrames: PLAYER_COMBO_WINDOW },
+    punch3: { key: 'kick', loop: false, holdFrames: PLAYER_COMBO_WINDOW },
+    slide: { key: 'roll', loop: false, holdFrames: PLAYER_SLIDE_DURATION },
+    hurt: { key: 'hurt', loop: false, holdFrames: HIT_STUN_FRAMES },
+  };
+
+  getSpriteDraw() {
+    // Jump is a z-offset overlay independent of `action` (see update()'s
+    // grounded/z handling), so it takes priority over whatever ground
+    // action is set while airborne.
+    if (!this.grounded) {
+      const t = clamp(this.jumpVy < 0 ? 0.15 : 0.6, 0, 0.999);
+      const frame = getSpriteFrame('jump', t);
+      if (frame) return frame;
+    }
+
+    const anim = Player.ANIM_MAP[this.action];
+    if (!anim) return null;
+    const holdFrames = anim.loop ? anim.cycleFrames : anim.holdFrames;
+    const t = anim.loop
+      ? (this.animTimer % holdFrames) / holdFrames
+      : clamp(this.animTimer / holdFrames, 0, 0.999);
+    return getSpriteFrame(anim.key, t);
   }
 
   // cameraX: world-space camera offset; screen-space x = this.x - cameraX.
@@ -200,14 +231,18 @@ class Player {
       ctx.restore();
     }
 
-    const slideFrame = this.action === 'slide' ? this.getSlideFrame() : null;
-    if (slideFrame) {
-      const drawH = 44;
-      const drawW = slideFrame.width * (drawH / slideFrame.height);
+    const spriteFrame = this.getSpriteDraw();
+    if (spriteFrame) {
+      const drawH = 52;
+      const drawW = spriteFrame.sw * (drawH / spriteFrame.sh);
       ctx.save();
       ctx.translate(sx, this.y + this.z);
       ctx.scale(this.facing, 1);
-      ctx.drawImage(slideFrame, -drawW / 2, -drawH, drawW, drawH);
+      ctx.drawImage(
+        spriteFrame.image,
+        spriteFrame.sx, spriteFrame.sy, spriteFrame.sw, spriteFrame.sh,
+        -drawW / 2, -drawH, drawW, drawH
+      );
       ctx.restore();
     } else {
       drawHumanoid(ctx, sx, this.y + this.z, {

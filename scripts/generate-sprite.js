@@ -25,10 +25,19 @@ const OUT_DIR = path.join(__dirname, 'generated');
 const STYLE_SUFFIXES = {
   // Character sprites: matches the flat cel-shaded look of the original
   // textures.jpeg pack (rounded, kid-friendly superhero comic style).
+  // Framing is deliberately strict and repeated multiple ways because the
+  // model does not reliably follow a single "plain white background"
+  // instruction -- it drifts to radial bursts, gradients, or scenic
+  // backgrounds. Consistent framing/scale/background matters here because
+  // these are cropped into game sprites, not viewed as standalone art.
   sprite:
     ', flat cel-shaded cartoon illustration, bold black outlines, ' +
-    'vibrant flat colors, children\'s superhero comic style, plain white background, ' +
-    'full body, clean vector-like linework',
+    'vibrant flat colors, children\'s superhero comic style, ' +
+    'solid flat magenta background color #FF00FF, no gradient, no vignette, ' +
+    'no radial burst, no scene, no props on the background, ' +
+    'full body visible from head to feet, character centered in frame, ' +
+    'standing on an invisible flat ground line, character fills about ' +
+    'two thirds of the frame height, clean vector-like linework',
   // Level backgrounds: wide side-scrolling beat-em-up scene, no characters.
   background:
     ', flat cel-shaded cartoon illustration background art, bold black outlines, ' +
@@ -80,10 +89,18 @@ function generate({ prompt, name, opts }) {
     process.exit(1);
   }
 
+  const DEFAULT_NEGATIVE = {
+    sprite: 'gradient background, radial burst, vignette, sunburst, rays, ' +
+      'scenery, props, text, watermark, logo, speech bubble, cropped, ' +
+      'close-up, partial body, zoomed in',
+    background: '',
+  };
+  const negative = [DEFAULT_NEGATIVE[opts.style], opts.negative_prompt].filter(Boolean).join(', ');
+
   const fullPrompt = prompt + STYLE_SUFFIXES[opts.style];
   const { body, boundary } = buildMultipartBody({
     prompt: fullPrompt,
-    negative_prompt: opts.negative_prompt,
+    negative_prompt: negative,
     aspect_ratio: opts.aspect_ratio,
     output_format: 'png',
   });
