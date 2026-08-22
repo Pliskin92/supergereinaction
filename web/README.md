@@ -55,6 +55,24 @@ since the source sheet only covers Super Gere in those specific poses.
 falls back to vector drawing automatically for anything not (yet) loaded, so
 a slow or failed image load never blocks or crashes the game.
 
+### Generating new sprites
+
+[scripts/generate-sprite.js](../scripts/generate-sprite.js) is a dev-time
+tool (not used by the game itself) that calls the Stability AI Stable Image
+API to generate new character art — useful for the enemy cast, which the
+original texture pack doesn't cover.
+
+```bash
+cp .env.example .env   # then fill in STABILITY_API_KEY (get a free key at
+                        # https://platform.stability.ai/account/keys)
+node --env-file=.env scripts/generate-sprite.js \
+  "Grandma Carla, angry cartoon villain, side view" grandma_carla_idle
+```
+
+Output lands in `scripts/generated/` (gitignored) as a raw PNG. Review it,
+crop/clean it up the same way the `textures.jpeg` frames were processed, and
+move the result into [assets/](assets/) before wiring it into the game.
+
 ## Code layout
 
 - [js/sprites.js](js/sprites.js) — procedural vector-drawn character
