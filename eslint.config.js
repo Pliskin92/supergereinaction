@@ -11,6 +11,8 @@ module.exports = [
         console: 'readonly',
         Math: 'readonly',
         Date: 'readonly',
+        Image: 'readonly',
+        Promise: 'readonly',
       },
     },
     rules: {

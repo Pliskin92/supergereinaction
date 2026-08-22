@@ -43,10 +43,25 @@ Build fury by fighting to trigger **Platinum State** — a temporary
 transformation (white hair, glowing eyes) that lets you call in an unlocked
 Uncle for a timed assist attack.
 
+## Art
+
+[assets/](assets/) holds real artwork cropped directly from the project's
+`textures.jpeg` character sheet: the hero portrait (menu screen), two HUD
+face expressions (normal and Platinum State), and all 4 frames of Gere's
+knee-slide animation. Everything else — walk/punch/idle/hurt poses and the
+whole enemy cast — is still procedurally drawn in [js/sprites.js](js/sprites.js),
+since the source sheet only covers Super Gere in those specific poses.
+[js/assets.js](js/assets.js) loads these images asynchronously and the game
+falls back to vector drawing automatically for anything not (yet) loaded, so
+a slow or failed image load never blocks or crashes the game.
+
 ## Code layout
 
 - [js/sprites.js](js/sprites.js) — procedural vector-drawn character
-  rendering (no image assets required)
+  rendering (used as a fallback and for everything the texture pack doesn't
+  cover)
+- [js/assets.js](js/assets.js) — loads the real cropped artwork from
+  [assets/](assets/)
 - [js/entities.js](js/entities.js) — Player, Enemy, and AssistSystem game
   logic
 - [js/levels.js](js/levels.js) — level/wave definitions and runtime

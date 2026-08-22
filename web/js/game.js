@@ -216,6 +216,23 @@ function drawBackground(colors) {
 }
 
 function drawHUD() {
+  // Face portrait
+  const face = player.platinum ? Assets.facePlatinumAngry : Assets.faceHappy;
+  if (face) {
+    const size = 34;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(10 + size / 2, 52 + size / 2, size / 2, 0, Math.PI * 2);
+    ctx.clip();
+    ctx.drawImage(face, 10, 52, size, size);
+    ctx.restore();
+    ctx.strokeStyle = player.platinum ? '#8fe8ff' : '#000';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(10 + size / 2, 52 + size / 2, size / 2, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
   // HP bar
   ctx.fillStyle = 'rgba(0,0,0,0.5)';
   ctx.fillRect(10, 10, 140, 14);
@@ -273,16 +290,24 @@ function drawMenu() {
   ctx.textAlign = 'center';
   ctx.fillStyle = '#ffd15c';
   ctx.font = 'bold 22px monospace';
-  ctx.fillText('SUPER GERE', W / 2, H / 2 - 30);
+  ctx.fillText('SUPER GERE', W / 2, H / 2 - 60);
   ctx.font = 'bold 12px monospace';
   ctx.fillStyle = '#fff';
-  ctx.fillText('Parise Rescue', W / 2, H / 2 - 12);
+  ctx.fillText('Parise Rescue', W / 2, H / 2 - 42);
 
-  drawHumanoid(ctx, W / 2, H / 2 + 40, { walkPhase: frame * 0.1, action: 'walk', facing: 1 }, PlayerColors);
+  const portrait = Assets.heroPortrait;
+  if (portrait) {
+    const drawH = 130;
+    const drawW = portrait.width * (drawH / portrait.height);
+    const bob = Math.sin(frame * 0.05) * 3;
+    ctx.drawImage(portrait, W / 2 - drawW / 2, H / 2 - drawH / 2 + 20 + bob, drawW, drawH);
+  } else {
+    drawHumanoid(ctx, W / 2, H / 2 + 40, { walkPhase: frame * 0.1, action: 'walk', facing: 1 }, PlayerColors);
+  }
 
   ctx.font = '10px monospace';
   ctx.fillStyle = frame % 60 < 30 ? '#fff' : '#888';
-  ctx.fillText('Press ENTER to start', W / 2, H / 2 + 80);
+  ctx.fillText('Press ENTER to start', W / 2, H - 14);
 }
 
 function drawShop() {
@@ -381,4 +406,5 @@ function loop() {
   requestAnimationFrame(loop);
 }
 
+loadAssets();
 loop();

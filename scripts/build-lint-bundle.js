@@ -6,7 +6,7 @@ const path = require('path');
 const WEB_JS = path.join(__dirname, '..', 'web', 'js');
 const OUT_DIR = path.join(__dirname, '..', '.lint-bundle');
 
-const loadOrder = ['sprites.js', 'entities.js', 'levels.js', 'game.js'];
+const loadOrder = ['sprites.js', 'assets.js', 'entities.js', 'levels.js', 'game.js'];
 
 fs.mkdirSync(OUT_DIR, { recursive: true });
 

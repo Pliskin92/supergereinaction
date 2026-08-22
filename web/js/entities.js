@@ -166,6 +166,18 @@ class Player {
     return null;
   }
 
+  getSlideFrame() {
+    // moveTimer counts down from PLAYER_SLIDE_DURATION to 0 during a slide;
+    // map elapsed progress onto the 4 real slide-cycle frames from the
+    // texture pack (crouch -> kick -> ground -> recover).
+    const elapsed = PLAYER_SLIDE_DURATION - this.moveTimer;
+    const t = clamp(elapsed / PLAYER_SLIDE_DURATION, 0, 0.999);
+    const frames = typeof PlayerSlideFrames === 'function' ? PlayerSlideFrames() : [];
+    if (frames.length < 4 || !frames.every(Boolean)) return null;
+    const idx = Math.floor(t * 4);
+    return frames[idx];
+  }
+
   draw(ctx) {
     ctx.save();
     if (this.invuln > 0 && Math.floor(this.invuln / 3) % 2 === 0) {
@@ -180,12 +192,24 @@ class Player {
       ctx.fill();
       ctx.restore();
     }
-    drawHumanoid(ctx, this.x, this.y + this.z, {
-      walkPhase: this.walkPhase,
-      action: this.action,
-      facing: this.facing,
-      platinum: this.platinum,
-    }, PlayerColors);
+
+    const slideFrame = this.action === 'slide' ? this.getSlideFrame() : null;
+    if (slideFrame) {
+      const drawH = 44;
+      const drawW = slideFrame.width * (drawH / slideFrame.height);
+      ctx.save();
+      ctx.translate(this.x, this.y + this.z);
+      ctx.scale(this.facing, 1);
+      ctx.drawImage(slideFrame, -drawW / 2, -drawH, drawW, drawH);
+      ctx.restore();
+    } else {
+      drawHumanoid(ctx, this.x, this.y + this.z, {
+        walkPhase: this.walkPhase,
+        action: this.action,
+        facing: this.facing,
+        platinum: this.platinum,
+      }, PlayerColors);
+    }
     ctx.restore();
   }
 }
