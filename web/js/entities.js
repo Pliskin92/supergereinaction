@@ -90,6 +90,10 @@ class Player {
     this.hp = clamp(this.hp + amount, 0, this.maxHp);
   }
 
+  // bounds: { left, right, top, bottom } — left/right clamp world-space x
+  // (either the full level worldWidth or a wave's soft-lock zone), top/bottom
+  // clamp y exactly as before. All movement/collision math here stays in
+  // world space; only draw() converts to screen space via cameraX.
   update(input, bounds) {
     let dx = 0, dy = 0;
 
@@ -178,7 +182,10 @@ class Player {
     return frames[idx];
   }
 
-  draw(ctx) {
+  // cameraX: world-space camera offset; screen-space x = this.x - cameraX.
+  // Defaults to 0 so callers that don't scroll (none left, but safe) still work.
+  draw(ctx, cameraX = 0) {
+    const sx = this.x - cameraX;
     ctx.save();
     if (this.invuln > 0 && Math.floor(this.invuln / 3) % 2 === 0) {
       ctx.globalAlpha = 0.4;
@@ -188,7 +195,7 @@ class Player {
       ctx.globalAlpha = 0.35;
       ctx.fillStyle = '#8fe8ff';
       ctx.beginPath();
-      ctx.arc(this.x, this.y - 20 + this.z, 22 + Math.sin(Date.now() / 100) * 2, 0, Math.PI * 2);
+      ctx.arc(sx, this.y - 20 + this.z, 22 + Math.sin(Date.now() / 100) * 2, 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
     }
@@ -198,12 +205,12 @@ class Player {
       const drawH = 44;
       const drawW = slideFrame.width * (drawH / slideFrame.height);
       ctx.save();
-      ctx.translate(this.x, this.y + this.z);
+      ctx.translate(sx, this.y + this.z);
       ctx.scale(this.facing, 1);
       ctx.drawImage(slideFrame, -drawW / 2, -drawH, drawW, drawH);
       ctx.restore();
     } else {
-      drawHumanoid(ctx, this.x, this.y + this.z, {
+      drawHumanoid(ctx, sx, this.y + this.z, {
         walkPhase: this.walkPhase,
         action: this.action,
         facing: this.facing,
@@ -273,6 +280,7 @@ class Enemy {
     this.flashTimer = 0;
   }
 
+  // bounds: same world-space {left, right, top, bottom} contract as Player.update.
   update(player, bounds) {
     if (this.dead) {
       this.deathTimer++;
@@ -330,13 +338,14 @@ class Enemy {
     return { x: this.x - 8, y: this.y - 30, w: 16, h: 30 };
   }
 
-  draw(ctx) {
+  draw(ctx, cameraX = 0) {
     if (this.dead && this.deathTimer > 60) return;
+    const sx = this.x - cameraX;
     ctx.save();
     if (this.flashTimer > 0) {
       ctx.filter = 'brightness(2)';
     }
-    drawHumanoid(ctx, this.x, this.y, {
+    drawHumanoid(ctx, sx, this.y, {
       walkPhase: this.walkPhase,
       action: this.action,
       facing: this.facing,
@@ -348,9 +357,9 @@ class Enemy {
       if (this.def.boss) {
         const w = 30;
         ctx.fillStyle = 'rgba(0,0,0,0.6)';
-        ctx.fillRect(this.x - w / 2, this.y - 52, w, 4);
+        ctx.fillRect(sx - w / 2, this.y - 52, w, 4);
         ctx.fillStyle = '#e84c4c';
-        ctx.fillRect(this.x - w / 2, this.y - 52, w * (this.hp / this.maxHp), 4);
+        ctx.fillRect(sx - w / 2, this.y - 52, w * (this.hp / this.maxHp), 4);
       }
     }
   }
@@ -417,9 +426,9 @@ class AssistSystem {
     }
   }
 
-  draw(ctx, player) {
+  draw(ctx, player, cameraX = 0) {
     if (!this.active) return;
-    const assistX = player.x + player.facing * 30;
+    const assistX = player.x + player.facing * 30 - cameraX;
     const colors = this.active === 'mattia'
       ? { suit: '#1e3a5f', accent: '#5cc9ff', skin: Palette.skin, hair: '#222' }
       : { suit: '#3a2a1e', accent: '#ff9d4d', skin: Palette.skin, hair: '#1a1a1a' };

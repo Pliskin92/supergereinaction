@@ -5,7 +5,28 @@ const ctx = canvas.getContext('2d');
 const W = canvas.width;
 const H = canvas.height;
 
+// BOUNDS.left/right are the vertical-lane fight box's screen margins, kept
+// for reference/UI; horizontal movement clamping is now done in world space
+// (see worldBounds()) since levels scroll. top/bottom (the fight lane) are
+// still screen-space-equivalent because the lane doesn't scroll vertically.
 const BOUNDS = { left: 24, right: W - 24, top: H - 90, bottom: H - 30 };
+
+let cameraX = 0;
+
+// World-space horizontal clamp for the player/enemies this frame: the full
+// level width, further restricted to the current wave's soft-lock zone
+// while enemies are alive (classic beat-em-up "can't outrun the fight").
+function worldBounds() {
+  const worldWidth = level ? level.worldWidth : W;
+  const lockRight = level ? level.advanceLockX() : worldWidth;
+  return { left: 0, right: Math.min(worldWidth, lockRight), top: BOUNDS.top, bottom: BOUNDS.bottom };
+}
+
+function updateCamera() {
+  const worldWidth = level ? level.worldWidth : W;
+  const target = player.x - W / 2;
+  cameraX = clamp(target, 0, Math.max(0, worldWidth - W));
+}
 
 const GameState = {
   MENU: 'menu',
@@ -94,6 +115,7 @@ function startLevel(idx) {
   player.x = 60;
   player.y = BOUNDS.bottom - 10;
   player.hitStun = 0;
+  cameraX = 0;
   state = GameState.LEVEL;
 }
 
@@ -148,8 +170,10 @@ function advanceFromShop() {
 function update() {
   frame++;
   if (state === GameState.LEVEL) {
-    player.update(Input, BOUNDS);
-    level.update(player, BOUNDS);
+    const wBounds = worldBounds();
+    player.update(Input, wBounds);
+    level.update(player, wBounds);
+    updateCamera();
     assists.update(player, level.enemies);
 
     // player attack resolution
@@ -196,6 +220,7 @@ function rectsOverlap(a, b) {
 }
 
 // ---- Rendering ----
+// Static (non-scrolling) screens: menu/shop/gameover/win — single fixed image.
 function drawBackground(colors, imageKey) {
   const image = imageKey ? Assets[imageKey] : null;
   if (image) {
@@ -210,7 +235,10 @@ function drawBackground(colors, imageKey) {
     ctx.fillRect(0, 0, W, H);
   }
 
-  // floor
+  drawFloor();
+}
+
+function drawFloor() {
   ctx.fillStyle = 'rgba(0,0,0,0.35)';
   ctx.fillRect(0, BOUNDS.bottom + 10, W, H - BOUNDS.bottom - 10);
   ctx.strokeStyle = 'rgba(255,255,255,0.06)';
@@ -220,6 +248,39 @@ function drawBackground(colors, imageKey) {
     ctx.lineTo(i - 10, H);
     ctx.stroke();
   }
+}
+
+// Scrolling level background: tiles the level's background segment(s) side
+// by side across worldWidth, offset by cameraX. Today each level has a
+// single bgImage key repeated to fill every segment slot (see
+// LevelRuntime.backgroundSegments); swapping in distinct art per segment
+// later only changes what backgroundSegments() returns, not this code.
+function drawLevelBackground(colors, runtime) {
+  const segments = runtime ? runtime.backgroundSegments() : [null];
+  const firstImage = segments.find(Boolean);
+  const image = firstImage ? Assets[firstImage] : null;
+
+  if (image) {
+    const startSeg = Math.floor(cameraX / SCREEN_W);
+    const endSeg = Math.floor((cameraX + W) / SCREEN_W);
+    for (let seg = startSeg; seg <= endSeg; seg++) {
+      if (seg < 0 || seg >= segments.length) continue;
+      const key = segments[seg] || firstImage;
+      const img = Assets[key] || image;
+      const drawX = seg * SCREEN_W - cameraX;
+      ctx.drawImage(img, drawX, 0, SCREEN_W, H);
+    }
+    ctx.fillStyle = 'rgba(0,0,0,0.15)';
+    ctx.fillRect(0, 0, W, H);
+  } else {
+    const grad = ctx.createLinearGradient(0, 0, 0, H);
+    grad.addColorStop(0, colors ? colors[0] : '#101018');
+    grad.addColorStop(1, colors ? colors[1] : '#202030');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  drawFloor();
 }
 
 function drawHUD() {
@@ -380,14 +441,14 @@ function drawPaused() {
 }
 
 function drawLevel() {
-  drawBackground(level.def.bg, level.def.bgImage);
+  drawLevelBackground(level.def.bg, level);
 
   const entities = [...level.activeEnemies(), player].sort((a, b) => a.y - b.y);
-  for (const ent of entities) ent.draw(ctx);
+  for (const ent of entities) ent.draw(ctx, cameraX);
 
-  assists.draw(ctx, player);
+  assists.draw(ctx, player, cameraX);
 
-  for (const im of impacts) drawImpact(ctx, im.x, im.y, im.t, im.color);
+  for (const im of impacts) drawImpact(ctx, im.x - cameraX, im.y, im.t, im.color);
 
   drawHUD();
 }
