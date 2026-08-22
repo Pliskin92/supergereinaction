@@ -1,0 +1,13 @@
+{
+  "name": "super-gere-parise-rescue",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Super Gere: Parise Rescue - a 2D side-scrolling beat-em-up",
+  "scripts": {
+    "lint": "eslint web/js && npm run lint:bundle",
+    "lint:bundle": "node scripts/build-lint-bundle.js && eslint .lint-bundle"
+  },
+  "devDependencies": {
+    "eslint": "^10.9.0"
+  }
+}
