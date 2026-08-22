@@ -22,21 +22,36 @@ const https = require('https');
 const API_URL = 'https://api.stability.ai/v2beta/stable-image/generate/core';
 const OUT_DIR = path.join(__dirname, 'generated');
 
-const STYLE_SUFFIX =
-  ', flat cel-shaded cartoon illustration, bold black outlines, ' +
-  'vibrant flat colors, children\'s superhero comic style, plain white background, ' +
-  'full body, clean vector-like linework';
+const STYLE_SUFFIXES = {
+  // Character sprites: matches the flat cel-shaded look of the original
+  // textures.jpeg pack (rounded, kid-friendly superhero comic style).
+  sprite:
+    ', flat cel-shaded cartoon illustration, bold black outlines, ' +
+    'vibrant flat colors, children\'s superhero comic style, plain white background, ' +
+    'full body, clean vector-like linework',
+  // Level backgrounds: wide side-scrolling beat-em-up scene, no characters.
+  background:
+    ', flat cel-shaded cartoon illustration background art, bold black outlines, ' +
+    'vibrant flat colors, children\'s superhero comic style, side-scrolling beat-em-up ' +
+    'stage background, wide indoor scene, no characters, no people, empty scene, ' +
+    'clean vector-like linework, slight perspective',
+};
 
 function parseArgs(argv) {
   const [, , prompt, name, ...rest] = argv;
   if (!prompt || !name) {
-    console.error('Usage: node scripts/generate-sprite.js "<prompt>" <output-name> [--aspect 1:1] [--negative "..."]');
+    console.error('Usage: node scripts/generate-sprite.js "<prompt>" <output-name> [--aspect 1:1] [--negative "..."] [--style sprite|background]');
     process.exit(1);
   }
-  const opts = { aspect_ratio: '1:1', negative_prompt: '' };
+  const opts = { aspect_ratio: '1:1', negative_prompt: '', style: 'sprite' };
   for (let i = 0; i < rest.length; i += 2) {
     if (rest[i] === '--aspect') opts.aspect_ratio = rest[i + 1];
     if (rest[i] === '--negative') opts.negative_prompt = rest[i + 1];
+    if (rest[i] === '--style') opts.style = rest[i + 1];
+  }
+  if (!STYLE_SUFFIXES[opts.style]) {
+    console.error(`Unknown --style "${opts.style}". Valid options: ${Object.keys(STYLE_SUFFIXES).join(', ')}`);
+    process.exit(1);
   }
   return { prompt, name, opts };
 }
@@ -65,7 +80,7 @@ function generate({ prompt, name, opts }) {
     process.exit(1);
   }
 
-  const fullPrompt = prompt + STYLE_SUFFIX;
+  const fullPrompt = prompt + STYLE_SUFFIXES[opts.style];
   const { body, boundary } = buildMultipartBody({
     prompt: fullPrompt,
     negative_prompt: opts.negative_prompt,

@@ -1,10 +1,15 @@
 // Level definitions matching the family-rescue story arc from the scaffold.
+// Each level is fought on the street outside the named relative's house;
+// bgImage is that street scene. shopImage is the interior of that same
+// house, shown on the shop screen once the street fight is won.
 
 const LevelDefs = [
   {
     id: 'grandma_carla',
-    name: 'Grandma Carla’s Kitchen',
+    name: 'Grandma Carla’s Street',
     bg: ['#3b2a1f', '#5c4530'],
+    bgImage: 'streetGrandma',
+    shopImage: 'shopGrandmaKitchen',
     waves: [
       ['minion', 'minion'],
       ['minion', 'minion', 'minion'],
@@ -15,8 +20,10 @@ const LevelDefs = [
   },
   {
     id: 'grandpa_gastone',
-    name: 'Grandpa Gastone’s Garage',
+    name: 'Grandpa Gastone’s Street',
     bg: ['#2a2a30', '#454550'],
+    bgImage: 'streetGrandpa',
+    shopImage: 'shopGrandpaGarage',
     waves: [
       ['minion', 'minion'],
       ['minion', 'minion', 'minion'],
@@ -28,8 +35,10 @@ const LevelDefs = [
   },
   {
     id: 'uncle_mattia',
-    name: 'Uncle Mattia’s Workshop',
+    name: 'Uncle Mattia’s Street',
     bg: ['#1a2a3a', '#2c4a63'],
+    bgImage: 'streetMattia',
+    shopImage: 'shopMattiaWorkshop',
     waves: [
       ['minion', 'minion'],
       ['minion', 'minion', 'minion'],
@@ -41,8 +50,10 @@ const LevelDefs = [
   },
   {
     id: 'uncle_michele',
-    name: 'Uncle Michele’s Yard',
+    name: 'Uncle Michele’s Street',
     bg: ['#1f2e1a', '#375c2c'],
+    bgImage: 'streetMichele',
+    shopImage: 'shopMicheleYard',
     waves: [
       ['minion', 'minion'],
       ['minion', 'minion', 'minion'],
@@ -57,6 +68,8 @@ const LevelDefs = [
     id: 'boss_luigi',
     name: 'Showdown with Boss Luigi',
     bg: ['#2a1f1f', '#5c2c2c'],
+    bgImage: 'streetBoss',
+    shopImage: 'shopBossLuigi',
     waves: [
       ['minion', 'minion'],
       ['boss_luigi'],

@@ -14,6 +14,18 @@ const AssetPaths = {
   slide2: 'assets/slide_2_kick.png',
   slide3: 'assets/slide_3_ground.png',
   slide4: 'assets/slide_4_recover.png',
+  // Level fight backgrounds: the street outside each relative's house.
+  streetGrandma: 'assets/street_grandma.jpg',
+  streetGrandpa: 'assets/street_grandpa.jpg',
+  streetMattia: 'assets/street_mattia.jpg',
+  streetMichele: 'assets/street_michele.jpg',
+  streetBoss: 'assets/street_boss.jpg',
+  // Shop backgrounds: interior of each relative's house, shown between levels.
+  shopGrandmaKitchen: 'assets/shop_grandma_kitchen.jpg',
+  shopGrandpaGarage: 'assets/shop_grandpa_garage.jpg',
+  shopMattiaWorkshop: 'assets/shop_mattia_workshop.jpg',
+  shopMicheleYard: 'assets/shop_michele_yard.jpg',
+  shopBossLuigi: 'assets/shop_boss_luigi.jpg',
 };
 
 const Assets = {};

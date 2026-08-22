@@ -196,12 +196,19 @@ function rectsOverlap(a, b) {
 }
 
 // ---- Rendering ----
-function drawBackground(colors) {
-  const grad = ctx.createLinearGradient(0, 0, 0, H);
-  grad.addColorStop(0, colors ? colors[0] : '#101018');
-  grad.addColorStop(1, colors ? colors[1] : '#202030');
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, W, H);
+function drawBackground(colors, imageKey) {
+  const image = imageKey ? Assets[imageKey] : null;
+  if (image) {
+    ctx.drawImage(image, 0, 0, W, H);
+    ctx.fillStyle = 'rgba(0,0,0,0.15)';
+    ctx.fillRect(0, 0, W, H);
+  } else {
+    const grad = ctx.createLinearGradient(0, 0, 0, H);
+    grad.addColorStop(0, colors ? colors[0] : '#101018');
+    grad.addColorStop(1, colors ? colors[1] : '#202030');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+  }
 
   // floor
   ctx.fillStyle = 'rgba(0,0,0,0.35)';
@@ -311,7 +318,8 @@ function drawMenu() {
 }
 
 function drawShop() {
-  drawBackground(['#1a1a2a', '#2a2a40']);
+  const shopImageKey = level ? level.def.shopImage : null;
+  drawBackground(['#1a1a2a', '#2a2a40'], shopImageKey);
   ctx.textAlign = 'center';
   ctx.fillStyle = '#ffd15c';
   ctx.font = 'bold 16px monospace';
@@ -372,7 +380,7 @@ function drawPaused() {
 }
 
 function drawLevel() {
-  drawBackground(level.def.bg);
+  drawBackground(level.def.bg, level.def.bgImage);
 
   const entities = [...level.activeEnemies(), player].sort((a, b) => a.y - b.y);
   for (const ent of entities) ent.draw(ctx);
