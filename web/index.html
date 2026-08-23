@@ -25,14 +25,15 @@
   #gameCanvas {
     background: #000;
     image-rendering: pixelated;
+    image-rendering: crisp-edges;
     border: 4px solid #2a2a3a;
     box-shadow: 0 0 40px rgba(255, 200, 60, 0.15);
     /* Actively scale the canvas to fill available space (not just cap it)
        while preserving its 480x270 (16:9) aspect ratio via width+height
        set together, since max-width/max-height alone don't grow a canvas
        past its intrinsic pixel size. */
-    width: min(96vw, 82vh * (480 / 270));
-    height: min(82vh, 96vw * (270 / 480));
+    width: min(96vw, 145.78vh);
+    height: min(82vh, 54vw);
   }
   #hint {
     font-size: 12px;
@@ -48,7 +49,7 @@
   <canvas id="gameCanvas" width="480" height="270"></canvas>
   <div id="hint">
     Move: <b>Arrow Keys / WASD</b> &nbsp; Punch Combo: <b>J</b> &nbsp; Knee Slide: <b>K</b> &nbsp;
-    Jump: <b>Space</b> &nbsp; Pause: <b>P</b>
+    Sling: <b>L</b> &nbsp; Jump: <b>Space</b> &nbsp; Pause: <b>P</b>
   </div>
 </div>
 

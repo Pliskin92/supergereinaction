@@ -3,30 +3,13 @@
 // drawing is used automatically for anything not yet loaded.
 
 const AssetPaths = {
-  heroPortrait: 'assets/hero_portrait.png',
-  faceHappy: 'assets/face_happy.png',
-  faceSmirk: 'assets/face_smirk.png',
-  faceBigSmile: 'assets/face_bigsmile.png',
-  faceAngry: 'assets/face_angry.png',
-  facePlatinumAngry: 'assets/face_platinum_angry.png',
-  facePlatinumShout: 'assets/face_platinum_shout.png',
-  // Level fight backgrounds: the street outside each relative's house.
-  // Grandma Carla's street has 4 distinct segments (the street visibly
-  // progresses toward her house); the rest still use one repeated image.
-  streetGrandmaSeg1: 'assets/street_grandma_seg1.jpg',
-  streetGrandmaSeg2: 'assets/street_grandma_seg2.jpg',
-  streetGrandmaSeg3: 'assets/street_grandma_seg3.jpg',
-  streetGrandmaSeg4: 'assets/street_grandma_seg4.jpg',
-  streetGrandpa: 'assets/street_grandpa.jpg',
-  streetMattia: 'assets/street_mattia.jpg',
-  streetMichele: 'assets/street_michele.jpg',
-  streetBoss: 'assets/street_boss.jpg',
-  // Shop backgrounds: interior of each relative's house, shown between levels.
-  shopGrandmaKitchen: 'assets/shop_grandma_kitchen.jpg',
-  shopGrandpaGarage: 'assets/shop_grandpa_garage.jpg',
-  shopMattiaWorkshop: 'assets/shop_mattia_workshop.jpg',
-  shopMicheleYard: 'assets/shop_michele_yard.jpg',
-  shopBossLuigi: 'assets/shop_boss_luigi.jpg',
+  heroPortrait: 'assets/release/hero_portrait.png',
+  faceHappy: 'assets/release/face_happy.png',
+  faceSmirk: 'assets/release/face_smirk.png',
+  faceBigSmile: 'assets/release/face_bigsmile.png',
+  faceAngry: 'assets/release/face_angry.png',
+  streetLv1Example1: 'assets/release/street-lv1-example1.jpg',
+  streetLv1Example2: 'assets/release/street-lv1-example2.jpg',
 };
 
 // Multi-frame sprite-sheet animations, generated via AutoSprite (see
@@ -92,8 +75,8 @@ function loadJSON(src) {
 
 function loadSpriteSheet(character, action, dir) {
   return Promise.all([
-    loadImage(`assets/${dir}/spritesheet.png`),
-    loadJSON(`assets/${dir}/atlas.json`),
+    loadImage(`assets/release/${dir}/spritesheet.png`),
+    loadJSON(`assets/release/${dir}/atlas.json`),
   ]).then(([image, atlas]) => {
     if (!image || !atlas) return;
     const frameKeys = Object.keys(atlas.frames).sort((a, b) => Number(a) - Number(b));

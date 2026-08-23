@@ -1,27 +1,21 @@
 // Entity logic: player, enemies, assists. Ported/expanded from the PSn00bSDK C scaffold.
 
-const PLAYER_MOVE_SPEED = 1.0;
-// Sprite draw height for all characters (player, enemies, NPCs), in canvas
-// px. Canvas is 270px tall; characters should read as a clear foreground
-// presence without dominating the whole fight lane (which spans roughly
-// the bottom half of the canvas — see BOUNDS in game.js).
-const CHARACTER_SPRITE_HEIGHT = 72;
-
+const PLAYER_MOVE_SPEED = 0.3;
 // Drawn under every character's feet (real sprite-sheet frames don't carry
 // their own ground shadow the way drawHumanoid's vector fallback does) so
 // they visually plant on the street instead of floating over it.
-function drawGroundShadow(ctx, sx, y) {
+function drawGroundShadow(ctx, sx, y, spriteWidth) {
   ctx.save();
   ctx.fillStyle = 'rgba(0,0,0,0.35)';
   ctx.beginPath();
-  ctx.ellipse(sx, y + 3, CHARACTER_SPRITE_HEIGHT * 0.22, CHARACTER_SPRITE_HEIGHT * 0.07, 0, 0, Math.PI * 2);
+  ctx.ellipse(sx, y + 3, spriteWidth * 0.22, spriteWidth * 0.07, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
 }
 const PLAYER_SLIDE_SPEED = 4.2;
 const PLAYER_COMBO_WINDOW = 22;
 const PLAYER_SLIDE_DURATION = 26;
-const PLATINUM_STATE_FRAMES = 10 * 60;
+const PLAYER_SLING_DURATION = 28;
 const HIT_STUN_FRAMES = 14;
 
 const PlayerColors = {
@@ -33,6 +27,17 @@ const PlayerColors = {
   hair: Palette.hair,
 };
 
+const PLAYER_ANIM_MAP = {
+  idle: { key: 'idle', loop: true, cycleFrames: 80 },
+  walk: { key: 'walk', loop: true, cycleFrames: 48 },
+  punch1: { key: 'punch', loop: false, holdFrames: PLAYER_COMBO_WINDOW },
+  punch2: { key: 'punch', loop: false, holdFrames: PLAYER_COMBO_WINDOW },
+  punch3: { key: 'kick', loop: false, holdFrames: PLAYER_COMBO_WINDOW },
+  slide: { key: 'roll', loop: false, holdFrames: PLAYER_SLIDE_DURATION },
+  shoot: { key: 'shoot', loop: false, holdFrames: PLAYER_SLING_DURATION },
+  hurt: { key: 'hurt', loop: false, holdFrames: HIT_STUN_FRAMES },
+};
+
 class Player {
   constructor(x, y) {
     this.x = x;
@@ -42,9 +47,6 @@ class Player {
     this.facing = 1;
     this.hp = 100;
     this.maxHp = 100;
-    this.fury = 0;
-    this.platinumTimer = 0;
-    this.platinum = false;
     this.comboStep = 0;
     this.comboDamage = 0;
     this.moveTimer = 0;
@@ -56,6 +58,7 @@ class Player {
     this.jumpVy = 0;
     this.grounded = true;
     this.z = 0; // depth offset for jump visual
+    this.slingShot = false;
     this.animTimer = 0; // frames elapsed in the current action, for sprite-sheet playback
     this.prevAction = 'idle';
   }
@@ -69,11 +72,6 @@ class Player {
     this.moveTimer = PLAYER_COMBO_WINDOW;
     this.comboDamage = 8 + this.comboStep * 4;
     this.attackHit = false;
-    this.fury = clamp(this.fury + 8, 0, 100);
-    if (this.fury >= 100 && !this.platinum) {
-      this.platinum = true;
-      this.platinumTimer = PLATINUM_STATE_FRAMES;
-    }
   }
 
   startKneeSlide() {
@@ -83,11 +81,13 @@ class Player {
     this.moveTimer = PLAYER_SLIDE_DURATION;
     this.vx = this.facing * PLAYER_SLIDE_SPEED;
     this.attackHit = false;
-    this.fury = clamp(this.fury + 12, 0, 100);
-    if (this.fury >= 100 && !this.platinum) {
-      this.platinum = true;
-      this.platinumTimer = PLATINUM_STATE_FRAMES;
-    }
+  }
+
+  startSling() {
+    if (this.hitStun > 0 || this.moveTimer > 0) return;
+    this.action = 'shoot';
+    this.moveTimer = PLAYER_SLING_DURATION;
+    this.slingShot = true;
   }
 
   jump() {
@@ -124,6 +124,7 @@ class Player {
       if (input.pressed.punch) this.startPunchCombo();
       if (input.pressed.slide) this.startKneeSlide();
       if (input.pressed.jump) this.jump();
+      if (input.pressed.shoot) this.startSling();
 
       if (this.moveTimer > 0) this.moveTimer--;
 
@@ -170,14 +171,6 @@ class Player {
 
     if (this.invuln > 0) this.invuln--;
 
-    if (this.platinum && this.platinumTimer > 0) {
-      this.platinumTimer--;
-      if (this.platinumTimer === 0) {
-        this.platinum = false;
-        this.fury = 0;
-      }
-    }
-
     if (this.action !== this.prevAction) {
       this.animTimer = 0;
       this.prevAction = this.action;
@@ -196,21 +189,6 @@ class Player {
     return null;
   }
 
-  // Maps in-game action states to AutoSprite animation clips (see
-  // GereSpriteSheets in assets.js). 'loop': true plays the clip on a
-  // repeating cycle (idle/walk/run); false plays once and holds the last
-  // frame (attacks/jump/hurt), matching how moveTimer/hitStun already gate
-  // those actions' duration.
-  static ANIM_MAP = {
-    idle: { key: 'idle', loop: true, cycleFrames: 40 },
-    walk: { key: 'walk', loop: true, cycleFrames: 24 },
-    punch1: { key: 'punch', loop: false, holdFrames: PLAYER_COMBO_WINDOW },
-    punch2: { key: 'punch', loop: false, holdFrames: PLAYER_COMBO_WINDOW },
-    punch3: { key: 'kick', loop: false, holdFrames: PLAYER_COMBO_WINDOW },
-    slide: { key: 'roll', loop: false, holdFrames: PLAYER_SLIDE_DURATION },
-    hurt: { key: 'hurt', loop: false, holdFrames: HIT_STUN_FRAMES },
-  };
-
   getSpriteDraw() {
     // Jump is a z-offset overlay independent of `action` (see update()'s
     // grounded/z handling), so it takes priority over whatever ground
@@ -221,7 +199,7 @@ class Player {
       if (frame) return frame;
     }
 
-    const anim = Player.ANIM_MAP[this.action];
+    const anim = PLAYER_ANIM_MAP[this.action];
     if (!anim) return null;
     const holdFrames = anim.loop ? anim.cycleFrames : anim.holdFrames;
     const t = anim.loop
@@ -238,21 +216,11 @@ class Player {
     if (this.invuln > 0 && Math.floor(this.invuln / 3) % 2 === 0) {
       ctx.globalAlpha = 0.4;
     }
-    if (this.platinum) {
-      ctx.save();
-      ctx.globalAlpha = 0.35;
-      ctx.fillStyle = '#8fe8ff';
-      ctx.beginPath();
-      ctx.arc(sx, this.y - 20 + this.z, 22 + Math.sin(Date.now() / 100) * 2, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-    }
-
     const spriteFrame = this.getSpriteDraw();
     if (spriteFrame) {
-      drawGroundShadow(ctx, sx, this.y);
-      const drawH = CHARACTER_SPRITE_HEIGHT;
-      const drawW = spriteFrame.sw * (drawH / spriteFrame.sh);
+      const drawW = spriteFrame.sw;
+      const drawH = spriteFrame.sh;
+      drawGroundShadow(ctx, sx, this.y, drawW);
       ctx.save();
       ctx.translate(sx, this.y + this.z);
       ctx.scale(this.facing, 1);
@@ -267,7 +235,6 @@ class Player {
         walkPhase: this.walkPhase,
         action: this.action,
         facing: this.facing,
-        platinum: this.platinum,
       }, PlayerColors);
     }
     ctx.restore();
@@ -456,9 +423,9 @@ class Enemy {
     }
     const spriteFrame = this.getSpriteDraw();
     if (spriteFrame) {
-      drawGroundShadow(ctx, sx, this.y);
-      const drawH = CHARACTER_SPRITE_HEIGHT;
-      const drawW = spriteFrame.sw * (drawH / spriteFrame.sh);
+      const drawW = spriteFrame.sw;
+      const drawH = spriteFrame.sh;
+      drawGroundShadow(ctx, sx, this.y, drawW);
       ctx.save();
       ctx.translate(sx, this.y);
       ctx.scale(this.facing, 1);
@@ -631,9 +598,9 @@ class NPC {
     ctx.save();
     const spriteFrame = this.getSpriteDraw();
     if (spriteFrame) {
-      drawGroundShadow(ctx, sx, this.y);
-      const drawH = CHARACTER_SPRITE_HEIGHT;
-      const drawW = spriteFrame.sw * (drawH / spriteFrame.sh);
+      const drawW = spriteFrame.sw;
+      const drawH = spriteFrame.sh;
+      drawGroundShadow(ctx, sx, this.y, drawW);
       ctx.save();
       ctx.translate(sx, this.y);
       ctx.scale(this.facing, 1);

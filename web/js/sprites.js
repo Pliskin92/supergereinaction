@@ -8,8 +8,6 @@ const Palette = {
   suitGold: '#e8b13d',
   capeGold: '#f0c34d',
   hair: '#6b4226',
-  hairPlatinum: '#f4f0e6',
-  eyeAngry: '#3fd6ff',
   outline: '#0a0a0a',
 };
 
@@ -32,7 +30,7 @@ function rr(ctx, x, y, w, h, r) {
 }
 
 // Generic humanoid draw used for player + family cast, parameterized by palette/pose.
-// pose: { walkPhase, action, facing, platinum, hitFlash }
+// pose: { walkPhase, action, facing, hitFlash }
 function drawHumanoid(ctx, x, y, pose, colors) {
   const facing = pose.facing || 1;
   ctx.save();
@@ -137,17 +135,10 @@ function drawHumanoid(ctx, x, y, pose, colors) {
   ctx.stroke();
 
   // hair
-  ctx.fillStyle = pose.platinum ? Palette.hairPlatinum : (colors.hair || Palette.hair);
+  ctx.fillStyle = colors.hair || Palette.hair;
   ctx.beginPath();
   ctx.arc(0, headY - 2, 8.5, Math.PI, Math.PI * 2);
   ctx.fill();
-  if (pose.platinum) {
-    ctx.save();
-    ctx.shadowColor = '#8fe8ff';
-    ctx.shadowBlur = 8;
-    ctx.fillRect(-8, headY - 10, 16, 6);
-    ctx.restore();
-  }
 
   // face
   ctx.fillStyle = Palette.outline;
@@ -160,16 +151,9 @@ function drawHumanoid(ctx, x, y, pose, colors) {
     ctx.strokeStyle = Palette.outline;
     ctx.stroke();
   } else {
-    const eyeColor = pose.platinum ? Palette.eyeAngry : Palette.outline;
-    ctx.fillStyle = eyeColor;
-    if (pose.platinum) {
-      ctx.save();
-      ctx.shadowColor = eyeColor;
-      ctx.shadowBlur = 4;
-    }
+    ctx.fillStyle = Palette.outline;
     ctx.fillRect(1.5, headY - 1, 2, 2);
     ctx.fillRect(-3.5, headY - 1, 2, 2);
-    if (pose.platinum) ctx.restore();
   }
 
   ctx.restore(); // torso rotate/translate
