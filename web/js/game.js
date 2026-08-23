@@ -85,6 +85,11 @@ let player = new Player(60, BOUNDS.bottom - 10);
 let previewCharacters = [];
 let arena = null;
 
+// Decorative showcase: a Gere that patrols the canvas middle on his own.
+const WALKER_RANGE = 60;
+let centerWalker = null;
+let walkerDir = 1;
+
 function resetRun() {
   player = new Player(60, BOUNDS.bottom - 10);
   previewCharacters = [
@@ -92,6 +97,8 @@ function resetRun() {
     new Player(300, BOUNDS.bottom - 10, 'minion', true),
     new Player(420, BOUNDS.bottom - 10, 'boss1', true),
   ];
+  centerWalker = new Player(W / 2, BOUNDS.bottom - 10, 'gere', true);
+  walkerDir = 1;
   arena = new MechanicsArena();
 }
 
@@ -102,6 +109,8 @@ function startArena() {
   for (const character of previewCharacters) {
     character.y = BOUNDS.bottom - 10;
   }
+  centerWalker.x = W / 2;
+  walkerDir = 1;
   player.hitStun = 0;
   cameraX = 0;
   state = GameState.LEVEL;
@@ -121,6 +130,9 @@ function update() {
     const wBounds = worldBounds();
     player.update(Input, wBounds);
     for (const character of previewCharacters) character.update(Input, wBounds);
+    if (centerWalker.x > W / 2 + WALKER_RANGE) walkerDir = -1;
+    else if (centerWalker.x < W / 2 - WALKER_RANGE) walkerDir = 1;
+    centerWalker.update({ held: { left: walkerDir < 0, right: walkerDir > 0 } }, wBounds);
     player.slingShot = false;
     updateCamera();
   }
@@ -140,6 +152,7 @@ function drawPaused() {
 }
 
 function drawLevel() {
+  centerWalker.draw(ctx, cameraX);
   player.draw(ctx, cameraX);
   for (const character of previewCharacters) character.draw(ctx, cameraX);
 }

@@ -33,72 +33,29 @@ const PlayerColors = {
   hair: Palette.hair,
 };
 
-// Each playable character has its own sprite-sheet coverage (see
-// CharacterSpriteSheets in assets.js), so the combat action -> clip mapping
-// is data-driven per spriteCharacter. An action key that's absent for a
-// character (e.g. no 'roll' clip) simply can't be triggered for them —
-// see Player.hasAction().
-const PLAYER_ANIM_MAPS = {
-  gere: {
-    idle: { key: 'idle', loop: true, cycleFrames: 80 },
-    walk: { key: 'walk', loop: true, cycleFrames: GERE_WALK_CYCLE_FRAMES },
-    run: { key: 'run', loop: true, cycleFrames: 80 },
-    jump: { key: 'jump', loop: false, holdFrames: PLAYER_JUMP_DURATION },
-    punch1: { key: 'punch', loop: false, holdFrames: PLAYER_COMBO_WINDOW },
-    punch2: { key: 'punch', loop: false, holdFrames: PLAYER_COMBO_WINDOW },
-    punch3: { key: 'kick', loop: false, holdFrames: PLAYER_COMBO_WINDOW },
-    slide: { key: 'roll', loop: false, holdFrames: PLAYER_SLIDE_DURATION },
-    heavy: { key: 'shoot', loop: false, holdFrames: PLAYER_HEAVY_DURATION },
-    hurt: { key: 'hurt', loop: false, holdFrames: HIT_STUN_FRAMES },
-  },
-  giox: {
-    idle: { key: 'idle', loop: true, cycleFrames: 80 },
-    walk: { key: 'walk', loop: true, cycleFrames: 80 },
-    run: { key: 'run', loop: true, cycleFrames: 80 },
-    jump: { key: 'jump', loop: false, holdFrames: PLAYER_JUMP_DURATION },
-    punch1: { key: 'kick', loop: false, holdFrames: PLAYER_COMBO_WINDOW },
-    punch2: { key: 'kick', loop: false, holdFrames: PLAYER_COMBO_WINDOW },
-    punch3: { key: 'kick', loop: false, holdFrames: PLAYER_COMBO_WINDOW },
-    heavy: { key: 'shockwave', loop: false, holdFrames: PLAYER_HEAVY_DURATION },
-    hurt: { key: 'hurt', loop: false, holdFrames: HIT_STUN_FRAMES },
-  },
-  minion: {
-    idle: { key: 'idle', loop: true, cycleFrames: 80 },
-    walk: { key: 'walk', loop: true, cycleFrames: 80 },
-    run: { key: 'run', loop: true, cycleFrames: 80 },
-    jump: { key: 'jump', loop: false, holdFrames: PLAYER_JUMP_DURATION },
-    punch1: { key: 'punch', loop: false, holdFrames: PLAYER_COMBO_WINDOW },
-    punch2: { key: 'punch', loop: false, holdFrames: PLAYER_COMBO_WINDOW },
-    punch3: { key: 'kick', loop: false, holdFrames: PLAYER_COMBO_WINDOW },
-    heavy: { key: 'shoot', loop: false, holdFrames: PLAYER_HEAVY_DURATION },
-  },
-  boss1: {
-    idle: { key: 'idle', loop: true, cycleFrames: 80 },
-    walk: { key: 'walk', loop: true, cycleFrames: 80 },
-    run: { key: 'run', loop: true, cycleFrames: 80 },
-    punch1: { key: 'punch', loop: false, holdFrames: PLAYER_COMBO_WINDOW },
-    punch2: { key: 'punch', loop: false, holdFrames: PLAYER_COMBO_WINDOW },
-    punch3: { key: 'kick', loop: false, holdFrames: PLAYER_COMBO_WINDOW },
-    heavy: { key: 'shoot', loop: false, holdFrames: PLAYER_HEAVY_DURATION },
-  },
+// Every character shares the same sprite-folder names (see
+// CharacterSpriteSheets in assets.js) and therefore the same action -> clip
+// mapping — no per-character table. A character missing a given clip (e.g.
+// carla has no combat sprites, boss1 has no jump) just doesn't have that
+// sheet loaded into SpriteAnims; Player.hasAction() checks that directly,
+// so the move is simply unavailable rather than needing to be listed here.
+const PLAYER_ANIM_MAP = {
+  idle: { key: 'idle_right', loop: true, cycleFrames: GERE_WALK_CYCLE_FRAMES },
+  walk: { key: 'walk_right', loop: true, cycleFrames: GERE_WALK_CYCLE_FRAMES },
+  run: { key: 'run_right', loop: true, cycleFrames: 80 },
+  jump: { key: 'jump_right', loop: false, holdFrames: PLAYER_JUMP_DURATION },
+  punch1: { key: 'punch', loop: false, holdFrames: PLAYER_COMBO_WINDOW },
+  punch2: { key: 'punch', loop: false, holdFrames: PLAYER_COMBO_WINDOW },
+  punch3: { key: 'kick', loop: false, holdFrames: PLAYER_COMBO_WINDOW },
+  slide: { key: 'roll', loop: false, holdFrames: PLAYER_SLIDE_DURATION },
+  heavy: { key: 'heavy', loop: false, holdFrames: PLAYER_HEAVY_DURATION },
+  hurt: { key: 'hurt', loop: false, holdFrames: HIT_STUN_FRAMES },
 };
 
-const PREVIEW_ANIM_MAPS = {
-  giovanni: {
-    idle: { key: 'idle', loop: true, cycleFrames: 80 },
-    walk: { key: 'walk', loop: true, cycleFrames: 80 },
-    run: { key: 'run', loop: true, cycleFrames: 80 },
-  },
-  minion: {
-    idle: { key: 'walk', loop: false, holdFrames: 1 },
-    walk: { key: 'walk', loop: true, cycleFrames: 80 },
-    run: { key: 'run', loop: true, cycleFrames: 80 },
-  },
-  boss1: {
-    idle: { key: 'walk', loop: false, holdFrames: 1 },
-    walk: { key: 'walk', loop: true, cycleFrames: 80 },
-    run: { key: 'run', loop: true, cycleFrames: 80 },
-  },
+const PREVIEW_ANIM_MAP = {
+  idle: { key: 'idle_right', loop: false, holdFrames: 1 },
+  walk: { key: 'walk_right', loop: true, cycleFrames: 80 },
+  run: { key: 'run_right', loop: true, cycleFrames: 80 },
 };
 
 class Player {
@@ -109,7 +66,7 @@ class Player {
     this.vy = 0;
     this.facing = 1;
     this.spriteCharacter = spriteCharacter;
-    this.animationMap = movementOnly ? PREVIEW_ANIM_MAPS[spriteCharacter] : PLAYER_ANIM_MAPS[spriteCharacter];
+    this.animationMap = movementOnly ? PREVIEW_ANIM_MAP : PLAYER_ANIM_MAP;
     this.movementOnly = movementOnly;
     this.hp = 100;
     this.maxHp = 100;
@@ -129,11 +86,18 @@ class Player {
     this.grounded = true;
   }
 
-  // Whether this character has a sprite-backed clip for the given combat
-  // action (jump/slide/heavy/punch1-3) — missing clips mean the move is
-  // simply unavailable for that character rather than falling back silently.
+  // Whether this character actually has a loaded sprite sheet for the given
+  // combat action (jump/slide/heavy/punch1-3) — the action -> clip mapping
+  // is the same for every character (PLAYER_ANIM_MAP), but not every
+  // character has every clip on disk (e.g. carla has no combat sprites,
+  // boss1 has no jump_right), so this checks SpriteAnims directly rather
+  // than just the map, and a missing clip means the move is simply
+  // unavailable for that character rather than falling back silently.
   hasAction(action) {
-    return !!(this.animationMap && this.animationMap[action]);
+    const entry = this.animationMap && this.animationMap[action];
+    if (!entry) return false;
+    const anims = SpriteAnims[this.spriteCharacter];
+    return !!(anims && anims[entry.key]);
   }
 
   startJump() {
@@ -349,13 +313,12 @@ const EnemyTypes = {
     hp: 30, speed: 0.7, damage: 6, contactRange: 14, color: { suit: '#38424f', accent: '#7d92a8', skin: Palette.skin, hair: '#333' },
     scoreValue: 100,
     spriteCharacter: 'minion',
-    // No sheet has an explicit idle/hurt clip — walk's first frame stands in
-    // for idle (a static "ready" pose), and hurt is conveyed purely via the
+    // No sheet has an explicit hurt clip — hurt is conveyed purely via the
     // existing flashTimer brightness flash rather than a dedicated clip.
     spriteAnimMap: {
-      idle: { key: 'walk', loop: false, holdFrames: 1 },
-      walk: { key: 'walk', loop: true, cycleFrames: 24 },
-      hurt: { key: 'walk', loop: false, holdFrames: 1 },
+      idle: { key: 'idle_right', loop: false, holdFrames: 1 },
+      walk: { key: 'walk_right', loop: true, cycleFrames: 24 },
+      hurt: { key: 'idle_right', loop: false, holdFrames: 1 },
     },
   },
   boss1: {
@@ -363,9 +326,9 @@ const EnemyTypes = {
     scoreValue: 2000, boss: true, name: 'The Hooded Villain',
     spriteCharacter: 'boss1',
     spriteAnimMap: {
-      idle: { key: 'walk', loop: false, holdFrames: 1 },
-      walk: { key: 'walk', loop: true, cycleFrames: 24 },
-      hurt: { key: 'walk', loop: false, holdFrames: 1 },
+      idle: { key: 'idle_right', loop: false, holdFrames: 1 },
+      walk: { key: 'walk_right', loop: true, cycleFrames: 24 },
+      hurt: { key: 'idle_right', loop: false, holdFrames: 1 },
       // 'ko' (this.dead) plays the fall/collapse clip once and holds the
       // last frame, matching how deathTimer already gates the KO duration.
       ko: { key: 'fall', loop: false, holdFrames: 60 },

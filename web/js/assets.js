@@ -13,81 +13,32 @@ const AssetPaths = {
 };
 
 // Multi-frame sprite-sheet animations, generated via AutoSprite (see
-// web/assets/<character>_sprites/<name>/{spritesheet.png,atlas.json}).
+// web/assets/release/<character>_sprites/<name>/{spritesheet.png,atlas.json}).
 // Each atlas.json describes a uniform grid of frames with pixel coordinates
-// and an overall clip duration. Sheets are namespaced per character
-// ("gere", "minion", "carla", ...) so different casts can reuse action
-// names (e.g. every character has its own "walk") without colliding.
-const CharacterSpriteSheets = {
-  gere: {
-    idle: 'gere_sprites/idle_right',
-    walk: 'gere_sprites/walk_right',
-    run: 'gere_sprites/run_right',
-    punch: 'gere_sprites/punch',
-    kick: 'gere_sprites/kick',
-    shoot: 'gere_sprites/attack_right',
-    jump: 'gere_sprites/jump_right',
-    roll: 'gere_sprites/roll',
-    hurt: 'gere_sprites/hurt',
-    victory: 'gere_sprites/victory',
-    dance: 'gere_sprites/dance',
-    dash: 'gere_sprites/dash',
-    fall: 'gere_sprites/fall',
-    hitReact: 'gere_sprites/hit_react',
-  },
-  giovanni: {
-    idle: 'giovanni_sprites/idle_right',
-    walk: 'giovanni_sprites/walk_right',
-    run: 'giovanni_sprites/run_right',
-    kick: 'giovanni_sprites/kick',
-    attack: 'giovanni_sprites/attack_right',
-    jump: 'giovanni_sprites/jump_right',
-    roll: 'giovanni_sprites/roll',
-    dash: 'giovanni_sprites/dash',
-    dance: 'giovanni_sprites/dance',
-    fall: 'giovanni_sprites/fall',
-    victory: 'giovanni_sprites/victory',
-  },
-  giox: {
-    idle: 'giox_sprites/idle_right',
-    walk: 'giox_sprites/walk_right',
-    run: 'giox_sprites/run_right',
-    attack: 'giox_sprites/attack_right',
-    jump: 'giox_sprites/jump_right',
-    kick: 'giox_sprites/Kick',
-    shockwave: 'giox_sprites/Tennis Slam Dunk Shockwave',
-    slam: 'giox_sprites/Tennis racket smash',
-    hurt: 'giox_sprites/Hurt',
-    hitReact: 'giox_sprites/Hit React',
-    victory: 'giox_sprites/Victory',
-    dance: 'giox_sprites/Dance',
-    fall: 'giox_sprites/Fall',
-    wave: 'giox_sprites/Wave',
-  },
-  minion: {
-    walk: 'minion_sprites/walk_right',
-    run: 'minion_sprites/run_right',
-    punch: 'minion_sprites/punch',
-    kick: 'minion_sprites/kick',
-    shoot: 'minion_sprites/attack_right',
-    jump: 'minion_sprites/jump_right',
-    idle: 'minion_sprites/idle_right',
-  },
-  carla: {
-    walk: 'carla_sprites/walk_right',
-    wave: 'carla_sprites/wave',
-    victory: 'carla_sprites/victory',
-  },
-  boss1: {
-    walk: 'boss1_sprites/walk_right',
-    run: 'boss1_sprites/run_right',
-    punch: 'boss1_sprites/punch',
-    kick: 'boss1_sprites/kick',
-    shoot: 'boss1_sprites/attack_right',
-    fall: 'boss1_sprites/fall',
-    idle: 'boss1_sprites/idle_right',
-  },
-};
+// and an overall clip duration.
+//
+// Every character's sprite folders use the same canonical action names
+// (below) — no per-character key remapping. A character simply omits the
+// folders it doesn't have (e.g. carla has no combat clips at all, boss1 has
+// no jump); loadSpriteSheet() already skips setting SpriteAnims[char][action]
+// when a sheet 404s, so a missing folder just means that action isn't
+// available for that character, with no separate gating table required.
+const CANONICAL_ACTIONS = [
+  'idle_right', 'walk_right', 'run_right', 'jump_right',
+  'punch', 'kick', 'heavy', 'roll',
+  'hurt', 'hit_react', 'fall', 'victory', 'dance', 'wave',
+];
+
+const PlayableCharacters = ['gere', 'giox', 'minion', 'boss1', 'carla', 'giovanni'];
+
+const CharacterSpriteSheets = {};
+for (const character of PlayableCharacters) {
+  const sheets = {};
+  for (const action of CANONICAL_ACTIONS) {
+    sheets[action] = `${character}_sprites/${action}`;
+  }
+  CharacterSpriteSheets[character] = sheets;
+}
 
 const Assets = {};
 const SpriteAnims = {}; // SpriteAnims[character][action] -> anim data

@@ -4,7 +4,7 @@ set -euo pipefail
 
 IMAGE_NAME="supergereinaction:latest"
 CONTAINER_NAME="supergereinaction"
-PORT="${PORT:-8080}"
+PORT="${PORT:-80}"
 
 cd "$(dirname "$0")/.."
 

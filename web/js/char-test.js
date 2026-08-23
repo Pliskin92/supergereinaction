@@ -1,9 +1,16 @@
 // Standalone animation viewer for /test/. Pick a character from the
 // dropdown; every loaded clip for that character becomes a button,
-// arrows/WASD move the sprite around the stage, F flips facing, and number
-// keys jump between clips.
+// arrows/WASD move the sprite around the stage, F flips facing, number
+// keys jump between clips, and J/K/L/Space mirror the real game's combat
+// bindings (punch-combo, roll, heavy attack, jump) via the shared
+// PLAYER_ANIM_MAP (see entities.js) — characters missing a clip on disk
+// (e.g. carla, an NPC with no combat sprites) simply don't respond to
+// those keys, same as in the real game.
 
-const CHAR_TEST_LOOP_ACTIONS = ['idle', 'walk', 'run', 'wave', 'victory', 'dance'];
+const CHAR_TEST_LOOP_ACTIONS = ['idle_right', 'walk_right', 'run_right', 'wave', 'victory', 'dance'];
+const CHAR_TEST_COMBO_WINDOW = 22;
+const CHAR_TEST_ATTACK_HOLD = 26;
+const CHAR_TEST_JUMP_HOLD = 42;
 
 const CharTest = {
   character: null,
@@ -19,6 +26,9 @@ const CharTest = {
   held: {},
   lastTime: 0,
   started: false,
+  comboStep: 0,
+  actionTimer: 0, // frames remaining in a non-looping combat action before it releases back to movement
+  lockedAction: null, // 'punch' | 'roll' | 'heavy' | 'jump' | null — which combat move currently owns actionTimer
 };
 
 function charTestSetUp() {
@@ -55,7 +65,7 @@ function charTestSelectCharacter(character) {
   CharTest.current = null;
   charTestBuildButtons();
   if (CharTest.actions.length > 0) {
-    charTestSetAction(CharTest.actions.includes('idle') ? 'idle' : CharTest.actions[0]);
+    charTestSetAction(CharTest.actions.includes('idle_right') ? 'idle_right' : CharTest.actions[0]);
   }
 }
 
@@ -80,19 +90,87 @@ function charTestSetAction(action) {
   if (!anims || !anims[action]) return;
   CharTest.current = action;
   CharTest.pos = 0;
+  CharTest.actionTimer = 0;
+  CharTest.lockedAction = null;
+  CharTest.comboStep = 0;
   document.querySelectorAll('#controls button').forEach((btn) => {
     btn.classList.toggle('active', btn.dataset.action === action);
   });
 }
 
+// Plays a combat move (punch-combo/roll/heavy/jump) the same way the real
+// game does: resolved through the shared PLAYER_ANIM_MAP (see entities.js)
+// rather than the raw clip-picker buttons, and locked so movement can't
+// interrupt it mid-swing. No-ops for characters missing that clip on disk
+// (e.g. carla has no combat sprites at all).
+//
+// charTestUpdate() always plays clips at their native authored speed
+// (frames / durationS), so the lock is held for at least that long —
+// otherwise the action would release back to idle before the animation
+// has actually played through, cutting it off just a few frames in.
+function charTestPlayCombat(logicalAction, minHoldFrames) {
+  const entry = PLAYER_ANIM_MAP[logicalAction];
+  if (!entry) return false;
+  const anims = SpriteAnims[CharTest.character];
+  const anim = anims && anims[entry.key];
+  if (!anim) return false;
+  const nativeTicks = (anim.durationS || 1) * 60;
+  CharTest.current = entry.key;
+  CharTest.pos = 0;
+  CharTest.actionTimer = Math.max(minHoldFrames, nativeTicks);
+  document.querySelectorAll('#controls button').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.action === entry.key);
+  });
+  return true;
+}
+
+function charTestPunch() {
+  // Unlike roll/heavy/jump, a punch mid-combo isn't blocked by actionTimer
+  // — pressing J again within the window advances to the next combo hit
+  // instead, matching Player.startPunchCombo() in entities.js. It's only
+  // blocked while a *different* locked action (roll/heavy/jump) is playing.
+  if (CharTest.actionTimer > 0 && CharTest.lockedAction !== 'punch') return;
+  CharTest.comboStep = (CharTest.comboStep % 3) + 1;
+  const step = ['punch1', 'punch2', 'punch3'][CharTest.comboStep - 1];
+  if (charTestPlayCombat(step, CHAR_TEST_COMBO_WINDOW)) {
+    CharTest.lockedAction = 'punch';
+  } else {
+    CharTest.comboStep = 0;
+  }
+}
+
+function charTestRoll() {
+  if (CharTest.actionTimer > 0) return;
+  CharTest.comboStep = 0;
+  if (charTestPlayCombat('slide', CHAR_TEST_ATTACK_HOLD)) CharTest.lockedAction = 'roll';
+}
+
+function charTestHeavy() {
+  if (CharTest.actionTimer > 0) return;
+  CharTest.comboStep = 0;
+  if (charTestPlayCombat('heavy', CHAR_TEST_ATTACK_HOLD)) CharTest.lockedAction = 'heavy';
+}
+
+function charTestJump() {
+  if (CharTest.actionTimer > 0) return;
+  CharTest.comboStep = 0;
+  if (charTestPlayCombat('jump', CHAR_TEST_JUMP_HOLD)) CharTest.lockedAction = 'jump';
+}
+
 function charTestKeyDown(e) {
   const k = e.key.toLowerCase();
-  if (k.startsWith('arrow')) e.preventDefault();
+  if (k.startsWith('arrow') || k === ' ') e.preventDefault();
   if (/^[1-9]$/.test(k)) {
     const idx = Number(k) - 1;
     if (idx < CharTest.actions.length) charTestSetAction(CharTest.actions[idx]);
   }
   if (k === 'f') CharTest.facing *= -1;
+  if (!CharTest.held[k]) {
+    if (k === 'j') charTestPunch();
+    if (k === 'k') charTestRoll();
+    if (k === 'l') charTestHeavy();
+    if (k === ' ') charTestJump();
+  }
   CharTest.held[k] = true;
 }
 
@@ -101,6 +179,16 @@ function charTestKeyUp(e) {
 }
 
 function charTestUpdate(dt) {
+  const frames = dt * 60;
+  if (CharTest.actionTimer > 0) {
+    CharTest.actionTimer -= frames;
+    if (CharTest.actionTimer <= 0) {
+      CharTest.actionTimer = 0;
+      CharTest.comboStep = 0;
+      if (CharTest.actions.includes('idle_right')) charTestSetAction('idle_right');
+    }
+  }
+
   let dx = 0, dy = 0;
   if (CharTest.held.arrowleft || CharTest.held.a) dx--;
   if (CharTest.held.arrowright || CharTest.held.d) dx++;
@@ -163,7 +251,7 @@ function charTestDraw() {
     10, 20
   );
   ctx.fillStyle = '#777';
-  ctx.fillText('Move: arrows/WASD · Flip: F · Clips: click or 1-9', 10, 38);
+  ctx.fillText('Move: arrows/WASD · Flip: F · Clips: click or 1-9 · Punch: J · Roll: K · Heavy: L · Jump: Space', 10, 38);
 }
 
 function charTestFrame(t) {
