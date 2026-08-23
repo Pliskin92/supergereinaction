@@ -34,6 +34,16 @@ const GERE_WALK_CYCLE_FRAMES = 140;
 // of layering invented physics on top of it.
 const PLAYER_JUMP_DURATION = 30;
 
+// A handful of sprite sheets were exported at the wrong scale relative to
+// the rest of that character's clips (measured by comparing each frame's
+// trimmed pixel bounding-box height against idle's) — e.g. gere's
+// jump_right renders the character ~25% shorter than every other gere
+// clip. This is a draw-time stopgap for known-bad clips until the
+// underlying spritesheet.png is re-exported at the correct scale.
+const SPRITE_SCALE_FIXUPS = {
+  gere: { jump: 1.335 },
+};
+
 const PlayerColors = {
   suit: Palette.suitBlack,
   accent: Palette.suitGold,
@@ -278,8 +288,9 @@ class Player {
     }
     const spriteFrame = this.getSpriteDraw();
     if (spriteFrame) {
-      const drawW = spriteFrame.sw;
-      const drawH = spriteFrame.sh;
+      const scale = SPRITE_SCALE_FIXUPS[this.spriteCharacter] && SPRITE_SCALE_FIXUPS[this.spriteCharacter][this.action] || 1;
+      const drawW = spriteFrame.sw * scale;
+      const drawH = spriteFrame.sh * scale;
       ctx.save();
       ctx.translate(sx, this.y);
       ctx.scale(this.facing, 1);

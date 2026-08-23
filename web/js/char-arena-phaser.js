@@ -157,22 +157,33 @@ class ArenaScene extends Phaser.Scene {
     return true;
   }
 
+  // Locks input for at least `minMs`, but never less than the clip's own
+  // native playback time (frameCount / durationS, in ms) — otherwise the
+  // action releases back to idle a fraction of the way through the
+  // animation, before it's actually visible (same bug as the vanilla arena
+  // had: see js/entities.js's getSpriteDraw comment history).
+  lockFor(action, minMs) {
+    const entry = this.available[action];
+    const nativeMs = entry ? entry.durationS * 1000 : minMs;
+    this.actionLockUntil = this.time.now + Math.max(minMs, nativeMs);
+  }
+
   startJump() {
     if (this.time.now < this.actionLockUntil) return;
     if (!this.playAction('jump_right', false)) return;
-    this.actionLockUntil = this.time.now + JUMP_DURATION_MS;
+    this.lockFor('jump_right', JUMP_DURATION_MS);
   }
 
   startHeavy() {
     if (this.time.now < this.actionLockUntil) return;
     if (!this.playAction('heavy', false)) return;
-    this.actionLockUntil = this.time.now + HEAVY_DURATION_MS;
+    this.lockFor('heavy', HEAVY_DURATION_MS);
   }
 
   startRoll() {
     if (this.time.now < this.actionLockUntil) return;
     if (!this.playAction('roll', false)) return;
-    this.actionLockUntil = this.time.now + SLIDE_DURATION_MS;
+    this.lockFor('roll', SLIDE_DURATION_MS);
   }
 
   startPunch() {
@@ -181,7 +192,7 @@ class ArenaScene extends Phaser.Scene {
     this.comboStep = this.comboStep < 3 ? this.comboStep + 1 : 1;
     const clip = this.comboStep === 3 ? 'kick' : 'punch';
     if (!this.playAction(clip, false)) { this.comboStep = 0; return; }
-    this.actionLockUntil = this.time.now + COMBO_WINDOW_MS;
+    this.lockFor(clip, COMBO_WINDOW_MS);
   }
 
   update(time, delta) {
