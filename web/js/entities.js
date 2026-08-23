@@ -34,13 +34,19 @@ function drawGroundShadow(ctx, sx, y, spriteWidth) {
 // glued to the floor. `offsetX` preserves the pose's horizontal lean
 // relative to the tile centre, so trimming doesn't snap a pose sideways.
 //
-// No scaling is applied: sprites render at whatever size they were drawn.
+// `liftScale` multiplies that rise, letting a move exaggerate its height
+// beyond what the artwork encodes (see PLAYER_JUMP_LIFT_SCALE). It is
+// applied per-caller rather than baked into the trim data because `lift`
+// also carries small incidental motion — run's stride bounce, for one —
+// that should stay at its authored size.
+//
+// No scaling is applied to the sprite itself: it renders at its drawn size.
 //
 // The caller is expected to have already translated to the character's
 // feet and applied any facing flip.
-function drawSpriteFrame(ctx, frame) {
+function drawSpriteFrame(ctx, frame, liftScale = 1) {
   const dx = frame.offsetX || 0;
-  const lift = frame.lift || 0;
+  const lift = (frame.lift || 0) * liftScale;
   ctx.drawImage(
     frame.image,
     frame.sx, frame.sy, frame.sw, frame.sh,
@@ -79,6 +85,12 @@ const GERE_WALK_CYCLE_FRAMES = 140;
 // a fast symmetric hop) while trimming a bit off the tail so a jump
 // doesn't lock input for the full clip length in fast-paced combat.
 const PLAYER_JUMP_DURATION = 108;
+
+// The artwork only lifts the character ~72px off the ground, which reads
+// as a hop rather than a jump at this sprite size. Multiplying the trim
+// data's `lift` exaggerates the arc without touching the sprite sheets or
+// the animation's timing — the same frames, just carried higher.
+const PLAYER_JUMP_LIFT_SCALE = 2;
 
 const PlayerColors = {
   suit: Palette.suitBlack,
@@ -173,8 +185,15 @@ class Player {
     if (!this.hasAction('punch1')) return;
     if (this.moveTimer > 0 && this.action === 'slide') return;
     if (this.moveTimer === 0) this.comboStep = 0;
-    if (this.comboStep < 3) this.comboStep++;
+    // Wrap back to the first hit after the finisher instead of clamping at
+    // 3 — clamping left a masher stuck replaying punch3, since comboStep
+    // only reset once moveTimer drained, i.e. only after waiting for idle.
+    this.comboStep = (this.comboStep % 3) + 1;
     this.action = ['punch1', 'punch2', 'punch3'][this.comboStep - 1];
+    // Re-triggering the same step (punch1 -> punch1 on a fast wrap) keeps
+    // this.action unchanged, so update()'s action !== prevAction check
+    // never fires; reset animTimer here or the clip freezes mid-swing.
+    this.animTimer = 0;
     this.moveTimer = PLAYER_COMBO_WINDOW;
     this.comboDamage = 8 + this.comboStep * 4;
     this.attackHit = false;
@@ -335,7 +354,11 @@ class Player {
       ctx.save();
       ctx.translate(sx, this.y);
       ctx.scale(this.facing, 1);
-      drawSpriteFrame(ctx, spriteFrame);
+      drawSpriteFrame(
+        ctx,
+        spriteFrame,
+        this.action === 'jump' ? PLAYER_JUMP_LIFT_SCALE : 1
+      );
       ctx.restore();
     } else {
       drawHumanoid(ctx, sx, this.y, {
