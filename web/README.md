@@ -32,12 +32,21 @@ python3 -m http.server 8080
 
 ## Story / Levels
 
-1. Grandma Carla's Kitchen
+1. Grandma Carla's Street
 2. Grandpa Gastone's Garage
 3. Uncle Mattia's Workshop (unlocks Uncle Mattia assist)
 4. Uncle Michele's Yard (unlocks Uncle Michele assist)
 5. Showdown with Boss Luigi
 6. Final Rescue: Mario, Wario & Bowser
+
+Family members are **rescued, not fought** — level 1 (the only one reworked
+so far) fights through waves of a robotic minion and a boss villain (both
+original designs, not family members), then Grandma Carla appears near the
+end of the street once the boss falls. Reach her and she's rescued (a
+floating "Grandma Carla is safe!" + score bump), which is what actually
+unlocks the shop/next-level transition — clearing the boss alone isn't
+enough. Levels 2-6 haven't been converted to this rescue structure yet and
+still use their original family-member-as-boss design.
 
 Build fury by fighting to trigger **Platinum State** — a temporary
 transformation (white hair, glowing eyes) that lets you call in an unlocked
@@ -62,11 +71,21 @@ menu screen, and two HUD face expressions for normal / Platinum State), plus
 generated street and shop background art per level (see
 "Generating backgrounds" below).
 
-Everything not covered by real art — the whole enemy cast, for now — is
-still procedurally drawn in [js/sprites.js](js/sprites.js). [js/assets.js](js/assets.js)
-loads all of this asynchronously and the game falls back to vector drawing
-automatically for anything not (yet) loaded, so a slow or failed image load
-never blocks or crashes the game.
+Level 1's enemy cast also has real sprite sheets: [assets/minion_sprites/](assets/minion_sprites/)
+(the recurring robotic henchman) and [assets/boss1_sprites/](assets/boss1_sprites/)
+(the boss villain, including a `fall` clip that plays on defeat). Grandma
+Carla, as a rescued NPC rather than an enemy, has her own smaller set at
+[assets/carla_sprites/](assets/carla_sprites/) — `wave` (played on loop while
+waiting) and `victory` (once rescued). `EnemyTypes` entries opt into sprite
+rendering via `spriteCharacter`/`spriteAnimMap` fields (see
+[js/entities.js](js/entities.js)); enemy types without those fields — the
+rest of the family-as-boss cast (Grandpa Gastone, the uncles, Boss Luigi,
+Mario/Wario/Bowser) — still render through the procedural vector fallback in
+[js/sprites.js](js/sprites.js), same as before.
+
+[js/assets.js](js/assets.js) loads all of this asynchronously and the game
+falls back to vector drawing automatically for anything not (yet) loaded, so
+a slow or failed image load never blocks or crashes the game.
 
 Giovanni (the second playable character) has a full sprite-sheet set saved
 at [assets/giovanni_sprites/](assets/giovanni_sprites/) but isn't wired into
@@ -85,10 +104,11 @@ character reference, pick an animation, get back a `spritesheet.png` +
 paid plan. The current workflow is manual: generate a sheet in the
 AutoSprite dashboard, download it, and drop the
 `<animation>/{spritesheet.png,atlas.json}` folder into
-`assets/gere_sprites/` (or `assets/giovanni_sprites/`) using the same
-lowercase-with-underscores naming as the existing folders, then add it to
-`GereSpriteSheets` in [js/assets.js](js/assets.js) if it's a new animation
-name.
+`assets/<character>_sprites/` (matching one of the character keys in
+`CharacterSpriteSheets` in [js/assets.js](js/assets.js) — `gere`, `minion`,
+`boss1`, `carla`, or a new one) using the same lowercase-with-underscores
+naming as the existing folders, then add the action -> folder mapping to
+that character's entry in `CharacterSpriteSheets`.
 
 ### Generating backgrounds
 

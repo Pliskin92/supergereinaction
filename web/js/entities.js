@@ -200,7 +200,7 @@ class Player {
     // action is set while airborne.
     if (!this.grounded) {
       const t = clamp(this.jumpVy < 0 ? 0.15 : 0.6, 0, 0.999);
-      const frame = getSpriteFrame('jump', t);
+      const frame = getSpriteFrame('gere', 'jump', t);
       if (frame) return frame;
     }
 
@@ -210,7 +210,7 @@ class Player {
     const t = anim.loop
       ? (this.animTimer % holdFrames) / holdFrames
       : clamp(this.animTimer / holdFrames, 0, 0.999);
-    return getSpriteFrame(anim.key, t);
+    return getSpriteFrame('gere', anim.key, t);
   }
 
   // cameraX: world-space camera offset; screen-space x = this.x - cameraX.
@@ -261,10 +261,28 @@ const EnemyTypes = {
   minion: {
     hp: 30, speed: 0.7, damage: 6, contactRange: 14, color: { suit: '#38424f', accent: '#7d92a8', skin: Palette.skin, hair: '#333' },
     scoreValue: 100,
+    spriteCharacter: 'minion',
+    // No sheet has an explicit idle/hurt clip — walk's first frame stands in
+    // for idle (a static "ready" pose), and hurt is conveyed purely via the
+    // existing flashTimer brightness flash rather than a dedicated clip.
+    spriteAnimMap: {
+      idle: { key: 'walk', loop: false, holdFrames: 1 },
+      walk: { key: 'walk', loop: true, cycleFrames: 24 },
+      hurt: { key: 'walk', loop: false, holdFrames: 1 },
+    },
   },
-  grandma_carla: {
-    hp: 80, speed: 0.5, damage: 10, contactRange: 16, color: { suit: '#7a3b56', accent: '#e8c1d6', skin: Palette.skinShade, hair: '#cfcfcf', emblem: null },
-    scoreValue: 500, boss: true, name: 'Grandma Carla',
+  boss1: {
+    hp: 220, speed: 0.55, damage: 16, contactRange: 20, color: { suit: '#0f5f2e', accent: '#ffffff', skin: Palette.skin, hair: '#1a1a1a' },
+    scoreValue: 2000, boss: true, name: 'The Hooded Villain',
+    spriteCharacter: 'boss1',
+    spriteAnimMap: {
+      idle: { key: 'walk', loop: false, holdFrames: 1 },
+      walk: { key: 'walk', loop: true, cycleFrames: 24 },
+      hurt: { key: 'walk', loop: false, holdFrames: 1 },
+      // 'ko' (this.dead) plays the fall/collapse clip once and holds the
+      // last frame, matching how deathTimer already gates the KO duration.
+      ko: { key: 'fall', loop: false, holdFrames: 60 },
+    },
   },
   grandpa_gastone: {
     hp: 110, speed: 0.45, damage: 14, contactRange: 18, color: { suit: '#4a4034', accent: '#c99a4a', skin: Palette.skinShade, hair: '#d8d8d8' },
@@ -313,12 +331,20 @@ class Enemy {
     this.dead = false;
     this.deathTimer = 0;
     this.flashTimer = 0;
+    this.animTimer = 0; // frames elapsed in the current action, for sprite-sheet playback
+    this.prevAction = 'idle';
   }
 
   // bounds: same world-space {left, right, top, bottom} contract as Player.update.
   update(player, bounds) {
     if (this.dead) {
       this.deathTimer++;
+      if (this.action !== this.prevAction) {
+        this.animTimer = 0;
+        this.prevAction = this.action;
+      } else {
+        this.animTimer++;
+      }
       return;
     }
 
@@ -327,6 +353,7 @@ class Enemy {
     if (this.hitStun > 0) {
       this.hitStun--;
       this.action = 'hurt';
+      this.tickAnimTimer();
       return;
     }
 
@@ -354,6 +381,31 @@ class Enemy {
 
     this.x = clamp(this.x, bounds.left, bounds.right);
     this.y = clamp(this.y, bounds.top, bounds.bottom);
+    this.tickAnimTimer();
+  }
+
+  tickAnimTimer() {
+    if (this.action !== this.prevAction) {
+      this.animTimer = 0;
+      this.prevAction = this.action;
+    } else {
+      this.animTimer++;
+    }
+  }
+
+  // Mirrors Player.getSpriteDraw()'s pattern, but per-enemy-type since each
+  // EnemyTypes entry owns its own spriteCharacter/spriteAnimMap (only some
+  // types have sheets — others return null and the caller falls back to
+  // drawHumanoid).
+  getSpriteDraw() {
+    if (!this.def.spriteCharacter || !this.def.spriteAnimMap) return null;
+    const anim = this.def.spriteAnimMap[this.action];
+    if (!anim) return null;
+    const holdFrames = anim.loop ? anim.cycleFrames : anim.holdFrames;
+    const t = anim.loop
+      ? (this.animTimer % holdFrames) / holdFrames
+      : clamp(this.animTimer / holdFrames, 0, 0.999);
+    return getSpriteFrame(this.def.spriteCharacter, anim.key, t);
   }
 
   takeDamage(amount) {
@@ -374,17 +426,36 @@ class Enemy {
   }
 
   draw(ctx, cameraX = 0) {
-    if (this.dead && this.deathTimer > 60) return;
+    // Death visuals (e.g. boss1's fall clip) hold for up to koAnim.holdFrames;
+    // types without a 'ko' clip keep the previous fixed 60-frame window.
+    const koAnim = this.def.spriteAnimMap && this.def.spriteAnimMap.ko;
+    const deathHoldFrames = koAnim ? koAnim.holdFrames : 60;
+    if (this.dead && this.deathTimer > deathHoldFrames) return;
     const sx = this.x - cameraX;
     ctx.save();
     if (this.flashTimer > 0) {
       ctx.filter = 'brightness(2)';
     }
-    drawHumanoid(ctx, sx, this.y, {
-      walkPhase: this.walkPhase,
-      action: this.action,
-      facing: this.facing,
-    }, this.def.color);
+    const spriteFrame = this.getSpriteDraw();
+    if (spriteFrame) {
+      const drawH = 52;
+      const drawW = spriteFrame.sw * (drawH / spriteFrame.sh);
+      ctx.save();
+      ctx.translate(sx, this.y);
+      ctx.scale(this.facing, 1);
+      ctx.drawImage(
+        spriteFrame.image,
+        spriteFrame.sx, spriteFrame.sy, spriteFrame.sw, spriteFrame.sh,
+        -drawW / 2, -drawH, drawW, drawH
+      );
+      ctx.restore();
+    } else {
+      drawHumanoid(ctx, sx, this.y, {
+        walkPhase: this.walkPhase,
+        action: this.action,
+        facing: this.facing,
+      }, this.def.color);
+    }
     ctx.restore();
 
     if (!this.dead) {
@@ -472,6 +543,94 @@ class AssistSystem {
       action: 'walk',
       facing: player.facing,
     }, colors);
+  }
+}
+
+// Rescued family-member NPCs shown at the end of a level once its boss wave
+// is cleared. Not an Enemy: no hp, no combat, can't be attacked. typeKey
+// indexes into NpcTypes (parallel to EnemyTypes) so future levels can add
+// grandpa/uncles/etc. by adding a table entry + a LevelDefs[i].npc field,
+// without touching this class.
+const NpcTypes = {
+  grandma_carla: {
+    name: 'Grandma Carla',
+    spriteCharacter: 'carla',
+    color: { suit: '#7a3b56', accent: '#e8c1d6', skin: Palette.skinShade, hair: '#cfcfcf', emblem: null },
+    waveAnim: { key: 'wave', loop: true, cycleFrames: 40 },
+    victoryAnim: { key: 'victory', loop: true, cycleFrames: 40 },
+    rescueText: 'Grandma Carla is safe!',
+    rescueScore: 500,
+  },
+};
+
+class NPC {
+  constructor(typeKey, x, y) {
+    this.type = typeKey;
+    this.def = NpcTypes[typeKey];
+    this.x = x;
+    this.y = y;
+    this.facing = -1;
+    this.rescued = false;
+    this.animTimer = 0;
+    this.prevAction = 'wave';
+  }
+
+  get action() {
+    return this.rescued ? 'victory' : 'wave';
+  }
+
+  // Called once level.complete flips true and the player has walked close
+  // enough — flips rescued state and returns true the single frame it does
+  // so callers can push a floatText/score bump exactly once.
+  rescue() {
+    if (this.rescued) return false;
+    this.rescued = true;
+    return true;
+  }
+
+  update() {
+    if (this.action !== this.prevAction) {
+      this.animTimer = 0;
+      this.prevAction = this.action;
+    } else {
+      this.animTimer++;
+    }
+  }
+
+  getSpriteDraw() {
+    const anim = this.rescued ? this.def.victoryAnim : this.def.waveAnim;
+    if (!anim) return null;
+    const holdFrames = anim.loop ? anim.cycleFrames : anim.holdFrames;
+    const t = anim.loop
+      ? (this.animTimer % holdFrames) / holdFrames
+      : clamp(this.animTimer / holdFrames, 0, 0.999);
+    return getSpriteFrame(this.def.spriteCharacter, anim.key, t);
+  }
+
+  draw(ctx, cameraX = 0) {
+    const sx = this.x - cameraX;
+    ctx.save();
+    const spriteFrame = this.getSpriteDraw();
+    if (spriteFrame) {
+      const drawH = 52;
+      const drawW = spriteFrame.sw * (drawH / spriteFrame.sh);
+      ctx.save();
+      ctx.translate(sx, this.y);
+      ctx.scale(this.facing, 1);
+      ctx.drawImage(
+        spriteFrame.image,
+        spriteFrame.sx, spriteFrame.sy, spriteFrame.sw, spriteFrame.sh,
+        -drawW / 2, -drawH, drawW, drawH
+      );
+      ctx.restore();
+    } else {
+      drawHumanoid(ctx, sx, this.y, {
+        walkPhase: this.animTimer * 0.1,
+        action: 'idle',
+        facing: this.facing,
+      }, this.def.color);
+    }
+    ctx.restore();
   }
 }
 

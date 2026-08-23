@@ -176,6 +176,12 @@ function update() {
     updateCamera();
     assists.update(player, level.enemies);
 
+    if (level.updateNpc(player)) {
+      const npcDef = level.npc.def;
+      floatTexts.push({ text: npcDef.rescueText, t: 0 });
+      score += npcDef.rescueScore;
+    }
+
     // player attack resolution
     const hb = player.getAttackHitbox();
     if (hb && !player.attackHit) {
@@ -197,7 +203,12 @@ function update() {
       state = GameState.GAMEOVER;
     }
 
-    if (level.complete) {
+    // When a level has a rescued NPC, hold off the shop/next-level
+    // transition until she's actually reached and rescued — otherwise
+    // level.complete (which fires the instant the boss dies) skips straight
+    // to the shop before the player ever gets to walk up to her.
+    const npcBlocking = level.npc && !level.npc.rescued;
+    if (level.complete && !npcBlocking) {
       const def = level.def;
       if (def.unlocksAssist) unlockedAssists.add(def.unlocksAssist);
       if (def.opensShop) {
@@ -443,7 +454,9 @@ function drawPaused() {
 function drawLevel() {
   drawLevelBackground(level.def.bg, level);
 
-  const entities = [...level.activeEnemies(), player].sort((a, b) => a.y - b.y);
+  const entities = [...level.activeEnemies(), player];
+  if (level.npc) entities.push(level.npc);
+  entities.sort((a, b) => a.y - b.y);
   for (const ent of entities) ent.draw(ctx, cameraX);
 
   assists.draw(ctx, player, cameraX);

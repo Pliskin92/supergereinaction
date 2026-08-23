@@ -12,6 +12,12 @@
 const SCREEN_W = 480;
 const LEVEL_SCREENS_WIDE = 4;
 const DEFAULT_WORLD_WIDTH = SCREEN_W * LEVEL_SCREENS_WIDE;
+// Fallback y for a level's NPC when LevelDefs[i].npc doesn't specify one —
+// matches the fight lane spawn.top + 20 convention used by spawnWave().
+const NPC_DEFAULT_Y = 20;
+// How close (world-space px) the player must walk to a rescued NPC's x
+// before she's considered "reached" and flips to her victory animation.
+const NPC_RESCUE_DISTANCE = 70;
 
 const LevelDefs = [
   {
@@ -24,10 +30,11 @@ const LevelDefs = [
     waves: [
       ['minion', 'minion'],
       ['minion', 'minion', 'minion'],
-      ['grandma_carla'],
+      ['boss1'],
     ],
     opensShop: true,
     unlocksAssist: null,
+    npc: { typeKey: 'grandma_carla', x: DEFAULT_WORLD_WIDTH - 60 },
   },
   {
     id: 'grandpa_gastone',
@@ -125,6 +132,16 @@ class LevelRuntime {
     // behavior, kept as-is).
     const waveCount = this.def.waves.length;
     this.waveThresholds = this.def.waves.map((_, i) => (this.worldWidth * i) / waveCount);
+
+    // Data-driven rescued-NPC support (see LevelDefs[i].npc), mirroring how
+    // bgImage/shopImage are already optional per-level fields. Only levels
+    // that set `npc` get one; other levels' runtimes simply have npc: null.
+    // y matches where spawnWave() places enemies (bounds.top + 20) since the
+    // real bounds.top isn't known until game.js's worldBounds() at draw time,
+    // and this is just a fixed spot in the fight lane.
+    this.npc = this.def.npc
+      ? new NPC(this.def.npc.typeKey, this.def.npc.x, this.def.npc.y != null ? this.def.npc.y : NPC_DEFAULT_Y)
+      : null;
   }
 
   // Placeholder segment list: the same bgImage key repeated across the level
@@ -160,6 +177,21 @@ class LevelRuntime {
       return new Enemy(type, x, y);
     });
     this.spawnedWave = true;
+  }
+
+  // Advances the NPC's idle animation every tick (so she's waving the whole
+  // fight, not just once reachable), and flips her to rescued once the level
+  // is complete AND the player has walked close enough to her position.
+  // Returns true the single tick rescue actually triggers, so game.js can
+  // push a floatText/score bump using its existing pattern — this class
+  // stays free of game.js's HUD/score globals.
+  updateNpc(player) {
+    if (!this.npc) return false;
+    this.npc.update();
+    if (this.npc.rescued) return false;
+    if (!this.complete) return false;
+    if (Math.abs(player.x - this.npc.x) > NPC_RESCUE_DISTANCE) return false;
+    return this.npc.rescue();
   }
 
   update(player, bounds) {
