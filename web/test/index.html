@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<base href="/" />
+<title>Character Test</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #0a0a12; color: #eee; font-family: 'Courier New', monospace; }
+  body { display: flex; flex-direction: column; align-items: center; gap: 10px; padding-top: 12px; }
+  #testCanvas {
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    border: 2px solid #2a2a3a;
+    width: min(92vw, 900px);
+  }
+  #characterSelect {
+    font-family: inherit;
+    font-size: 14px;
+    background: #181828;
+    color: #eee;
+    border: 1px solid #3a3a52;
+    padding: 6px 10px;
+  }
+  #controls { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; max-width: 900px; padding: 0 8px; }
+  #controls button {
+    font-family: inherit;
+    background: #181828;
+    color: #eee;
+    border: 1px solid #3a3a52;
+    padding: 5px 10px;
+    cursor: pointer;
+  }
+  #controls button.active { background: #ffd15c; color: #111; border-color: #ffd15c; }
+</style>
+</head>
+<body>
+<select id="characterSelect">
+  <option value="gere">Gere</option>
+  <option value="giox">Giox</option>
+  <option value="minion">Minion</option>
+  <option value="carla">Carla</option>
+  <option value="boss1">Boss 1</option>
+</select>
+<canvas id="testCanvas" width="960" height="480"></canvas>
+<div id="controls"></div>
+
+<script src="js/sprites.js"></script>
+<script src="js/assets.js"></script>
+<script src="js/entities.js"></script>
+<script src="js/char-test.js"></script>
+</body>
+</html>

@@ -41,10 +41,10 @@ docker run -p 8080:80 super-gere
 | Action | Keys |
 |--------|------|
 | **Move** | Arrow Keys or WASD |
-| **Punch Combo** | J |
-| **Knee Slide** | K |
 | **Jump** | Space |
-| **Call Uncle Assist** | L (Platinum State only) |
+| **Punch Combo (punch-punch-kick)** | J |
+| **Roll** | K |
+| **Heavy Attack** | L |
 | **Pause** | P |
 | **Confirm / Buy in Shop** | Enter |
 | **Leave Shop** | Escape |

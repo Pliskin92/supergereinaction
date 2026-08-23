@@ -1,6 +1,7 @@
 // Entity logic: player, enemies, assists. Ported/expanded from the PSn00bSDK C scaffold.
 
 const PLAYER_MOVE_SPEED = 0.3;
+const PLAYER_RUN_SPEED = 0.65;
 // Drawn under every character's feet (real sprite-sheet frames don't carry
 // their own ground shadow the way drawHumanoid's vector fallback does) so
 // they visually plant on the street instead of floating over it.
@@ -15,9 +16,13 @@ function drawGroundShadow(ctx, sx, y, spriteWidth) {
 const PLAYER_SLIDE_SPEED = 4.2;
 const PLAYER_COMBO_WINDOW = 22;
 const PLAYER_SLIDE_DURATION = 26;
-const PLAYER_SLING_DURATION = 28;
+const PLAYER_HEAVY_DURATION = 28;
 const HIT_STUN_FRAMES = 14;
 const GERE_WALK_CYCLE_FRAMES = 140;
+
+const PLAYER_JUMP_SPEED = 3.6;
+const PLAYER_GRAVITY = 0.18;
+const PLAYER_JUMP_DURATION = 42;
 
 const PlayerColors = {
   suit: Palette.suitBlack,
@@ -28,24 +33,84 @@ const PlayerColors = {
   hair: Palette.hair,
 };
 
-const PLAYER_ANIM_MAP = {
-  idle: { key: 'idle', loop: true, cycleFrames: 80 },
-  walk: { key: 'walk', loop: true, cycleFrames: GERE_WALK_CYCLE_FRAMES },
-  punch1: { key: 'punch', loop: false, holdFrames: PLAYER_COMBO_WINDOW },
-  punch2: { key: 'punch', loop: false, holdFrames: PLAYER_COMBO_WINDOW },
-  punch3: { key: 'kick', loop: false, holdFrames: PLAYER_COMBO_WINDOW },
-  slide: { key: 'roll', loop: false, holdFrames: PLAYER_SLIDE_DURATION },
-  shoot: { key: 'shoot', loop: false, holdFrames: PLAYER_SLING_DURATION },
-  hurt: { key: 'hurt', loop: false, holdFrames: HIT_STUN_FRAMES },
+// Each playable character has its own sprite-sheet coverage (see
+// CharacterSpriteSheets in assets.js), so the combat action -> clip mapping
+// is data-driven per spriteCharacter. An action key that's absent for a
+// character (e.g. no 'roll' clip) simply can't be triggered for them —
+// see Player.hasAction().
+const PLAYER_ANIM_MAPS = {
+  gere: {
+    idle: { key: 'idle', loop: true, cycleFrames: 80 },
+    walk: { key: 'walk', loop: true, cycleFrames: GERE_WALK_CYCLE_FRAMES },
+    run: { key: 'run', loop: true, cycleFrames: 80 },
+    jump: { key: 'jump', loop: false, holdFrames: PLAYER_JUMP_DURATION },
+    punch1: { key: 'punch', loop: false, holdFrames: PLAYER_COMBO_WINDOW },
+    punch2: { key: 'punch', loop: false, holdFrames: PLAYER_COMBO_WINDOW },
+    punch3: { key: 'kick', loop: false, holdFrames: PLAYER_COMBO_WINDOW },
+    slide: { key: 'roll', loop: false, holdFrames: PLAYER_SLIDE_DURATION },
+    heavy: { key: 'shoot', loop: false, holdFrames: PLAYER_HEAVY_DURATION },
+    hurt: { key: 'hurt', loop: false, holdFrames: HIT_STUN_FRAMES },
+  },
+  giox: {
+    idle: { key: 'idle', loop: true, cycleFrames: 80 },
+    walk: { key: 'walk', loop: true, cycleFrames: 80 },
+    run: { key: 'run', loop: true, cycleFrames: 80 },
+    jump: { key: 'jump', loop: false, holdFrames: PLAYER_JUMP_DURATION },
+    punch1: { key: 'kick', loop: false, holdFrames: PLAYER_COMBO_WINDOW },
+    punch2: { key: 'kick', loop: false, holdFrames: PLAYER_COMBO_WINDOW },
+    punch3: { key: 'kick', loop: false, holdFrames: PLAYER_COMBO_WINDOW },
+    heavy: { key: 'shockwave', loop: false, holdFrames: PLAYER_HEAVY_DURATION },
+    hurt: { key: 'hurt', loop: false, holdFrames: HIT_STUN_FRAMES },
+  },
+  minion: {
+    idle: { key: 'idle', loop: true, cycleFrames: 80 },
+    walk: { key: 'walk', loop: true, cycleFrames: 80 },
+    run: { key: 'run', loop: true, cycleFrames: 80 },
+    jump: { key: 'jump', loop: false, holdFrames: PLAYER_JUMP_DURATION },
+    punch1: { key: 'punch', loop: false, holdFrames: PLAYER_COMBO_WINDOW },
+    punch2: { key: 'punch', loop: false, holdFrames: PLAYER_COMBO_WINDOW },
+    punch3: { key: 'kick', loop: false, holdFrames: PLAYER_COMBO_WINDOW },
+    heavy: { key: 'shoot', loop: false, holdFrames: PLAYER_HEAVY_DURATION },
+  },
+  boss1: {
+    idle: { key: 'idle', loop: true, cycleFrames: 80 },
+    walk: { key: 'walk', loop: true, cycleFrames: 80 },
+    run: { key: 'run', loop: true, cycleFrames: 80 },
+    punch1: { key: 'punch', loop: false, holdFrames: PLAYER_COMBO_WINDOW },
+    punch2: { key: 'punch', loop: false, holdFrames: PLAYER_COMBO_WINDOW },
+    punch3: { key: 'kick', loop: false, holdFrames: PLAYER_COMBO_WINDOW },
+    heavy: { key: 'shoot', loop: false, holdFrames: PLAYER_HEAVY_DURATION },
+  },
+};
+
+const PREVIEW_ANIM_MAPS = {
+  giovanni: {
+    idle: { key: 'idle', loop: true, cycleFrames: 80 },
+    walk: { key: 'walk', loop: true, cycleFrames: 80 },
+    run: { key: 'run', loop: true, cycleFrames: 80 },
+  },
+  minion: {
+    idle: { key: 'walk', loop: false, holdFrames: 1 },
+    walk: { key: 'walk', loop: true, cycleFrames: 80 },
+    run: { key: 'run', loop: true, cycleFrames: 80 },
+  },
+  boss1: {
+    idle: { key: 'walk', loop: false, holdFrames: 1 },
+    walk: { key: 'walk', loop: true, cycleFrames: 80 },
+    run: { key: 'run', loop: true, cycleFrames: 80 },
+  },
 };
 
 class Player {
-  constructor(x, y) {
+  constructor(x, y, spriteCharacter = 'gere', movementOnly = false) {
     this.x = x;
     this.y = y;
     this.vx = 0;
     this.vy = 0;
     this.facing = 1;
+    this.spriteCharacter = spriteCharacter;
+    this.animationMap = movementOnly ? PREVIEW_ANIM_MAPS[spriteCharacter] : PLAYER_ANIM_MAPS[spriteCharacter];
+    this.movementOnly = movementOnly;
     this.hp = 100;
     this.maxHp = 100;
     this.comboStep = 0;
@@ -56,16 +121,41 @@ class Player {
     this.hitStun = 0;
     this.invuln = 0;
     this.attackHit = false; // whether current attack already landed
-    this.jumpVy = 0;
-    this.grounded = true;
-    this.z = 0; // depth offset for jump visual
     this.slingShot = false;
     this.animTimer = 0; // frames elapsed in the current action, for sprite-sheet playback
     this.prevAction = 'idle';
+    this.vy = 0;
+    this.jumpTimer = 0;
+    this.grounded = true;
+  }
+
+  // Whether this character has a sprite-backed clip for the given combat
+  // action (jump/slide/heavy/punch1-3) — missing clips mean the move is
+  // simply unavailable for that character rather than falling back silently.
+  hasAction(action) {
+    return !!(this.animationMap && this.animationMap[action]);
+  }
+
+  startJump() {
+    if (this.hitStun > 0 || !this.grounded) return;
+    if (!this.hasAction('jump')) return;
+    this.action = 'jump';
+    this.jumpTimer = PLAYER_JUMP_DURATION;
+    this.vy = -PLAYER_JUMP_SPEED;
+    this.grounded = false;
+  }
+
+  startHeavy() {
+    if (this.hitStun > 0 || this.moveTimer > 0 || !this.grounded) return;
+    if (!this.hasAction('heavy')) return;
+    this.action = 'heavy';
+    this.moveTimer = PLAYER_HEAVY_DURATION;
+    this.slingShot = true;
   }
 
   startPunchCombo() {
-    if (this.hitStun > 0) return;
+    if (this.hitStun > 0 || !this.grounded) return;
+    if (!this.hasAction('punch1')) return;
     if (this.moveTimer > 0 && this.action === 'slide') return;
     if (this.moveTimer === 0) this.comboStep = 0;
     if (this.comboStep < 3) this.comboStep++;
@@ -76,25 +166,13 @@ class Player {
   }
 
   startKneeSlide() {
-    if (this.hitStun > 0) return;
+    if (this.hitStun > 0 || !this.grounded) return;
+    if (!this.hasAction('slide')) return;
     if (this.moveTimer > 0 && this.action !== 'slide') return;
     this.action = 'slide';
     this.moveTimer = PLAYER_SLIDE_DURATION;
     this.vx = this.facing * PLAYER_SLIDE_SPEED;
     this.attackHit = false;
-  }
-
-  startSling() {
-    if (this.hitStun > 0 || this.moveTimer > 0) return;
-    this.action = 'shoot';
-    this.moveTimer = PLAYER_SLING_DURATION;
-    this.slingShot = true;
-  }
-
-  jump() {
-    if (!this.grounded || this.hitStun > 0) return;
-    this.jumpVy = -5.2;
-    this.grounded = false;
   }
 
   takeDamage(amount, fromX) {
@@ -117,17 +195,45 @@ class Player {
   update(input, bounds) {
     let dx = 0, dy = 0;
 
+    if (this.movementOnly) {
+      if (input.held.left) { dx--; this.facing = -1; }
+      if (input.held.right) { dx++; this.facing = 1; }
+      if (input.held.up) dy--;
+      if (input.held.down) dy++;
+      const speed = input.held.run ? PLAYER_RUN_SPEED : PLAYER_MOVE_SPEED;
+      this.x = clamp(this.x + dx * speed, bounds.left, bounds.right);
+      this.y = clamp(this.y + dy * speed, bounds.top, bounds.bottom);
+      this.action = dx !== 0 || dy !== 0 ? (input.held.run ? 'run' : 'walk') : 'idle';
+      if (this.action !== this.prevAction) {
+        this.animTimer = 0;
+        this.prevAction = this.action;
+      } else {
+        this.animTimer++;
+      }
+      return;
+    }
+
     if (this.hitStun > 0) {
       this.hitStun--;
       this.x += this.vx;
       this.vx *= 0.85;
     } else {
+      if (input.pressed.jump) this.startJump();
       if (input.pressed.punch) this.startPunchCombo();
       if (input.pressed.slide) this.startKneeSlide();
-      if (input.pressed.jump) this.jump();
-      if (input.pressed.shoot) this.startSling();
+      if (input.pressed.heavy) this.startHeavy();
 
       if (this.moveTimer > 0) this.moveTimer--;
+
+      if (!this.grounded) {
+        this.jumpTimer--;
+        this.vy += PLAYER_GRAVITY;
+        if (this.jumpTimer <= 0 || this.vy >= PLAYER_JUMP_SPEED) {
+          this.grounded = true;
+          this.vy = 0;
+          this.action = 'idle';
+        }
+      }
 
       if (this.action === 'slide' && this.moveTimer > 0) {
         this.x += this.vx;
@@ -137,28 +243,20 @@ class Player {
         if (input.held.up) dy--;
         if (input.held.down) dy++;
 
-        this.x += dx * PLAYER_MOVE_SPEED;
-        this.y += dy * PLAYER_MOVE_SPEED;
+        const speed = input.held.run ? PLAYER_RUN_SPEED : PLAYER_MOVE_SPEED;
+        this.x += dx * speed;
+        this.y += dy * speed;
 
-        if (dx !== 0 || dy !== 0) {
-          this.action = 'walk';
+        if (!this.grounded) {
+          // Airborne: keep the jump clip playing regardless of horizontal input.
+        } else if (dx !== 0 || dy !== 0) {
+          this.action = input.held.run ? 'run' : 'walk';
           this.walkPhase += 0.35;
         } else if (this.moveTimer === 0) {
           this.action = 'idle';
           this.comboStep = 0;
           this.comboDamage = 0;
         }
-      }
-    }
-
-    // jump physics (visual hop, doesn't leave the beat-em-up plane)
-    if (!this.grounded) {
-      this.z += this.jumpVy;
-      this.jumpVy += 0.35;
-      if (this.z >= 0) {
-        this.z = 0;
-        this.jumpVy = 0;
-        this.grounded = true;
       }
     }
 
@@ -187,32 +285,36 @@ class Player {
     if (this.action === 'slide' && this.moveTimer > 0) {
       return { x: this.x + this.facing * 6, y: this.y - 6, w: 20, h: 12, damage: 10 };
     }
+    if (this.action === 'heavy' && this.moveTimer > 0) {
+      return { x: this.x + this.facing * 20, y: this.y - 22, w: 24, h: 26, damage: 22 };
+    }
     return null;
   }
 
   getSpriteDraw() {
-    // Jump is a z-offset overlay independent of `action` (see update()'s
-    // grounded/z handling), so it takes priority over whatever ground
-    // action is set while airborne.
-    if (!this.grounded) {
-      const t = clamp(this.jumpVy < 0 ? 0.15 : 0.6, 0, 0.999);
-      const frame = getSpriteFrame('gere', 'jump', t);
-      if (frame) return frame;
-    }
-
-    const anim = PLAYER_ANIM_MAP[this.action];
+    const anim = this.animationMap[this.action];
     if (!anim) return null;
     const holdFrames = anim.loop ? anim.cycleFrames : anim.holdFrames;
     const t = anim.loop
       ? (this.animTimer % holdFrames) / holdFrames
       : clamp(this.animTimer / holdFrames, 0, 0.999);
-    return getSpriteFrame('gere', anim.key, t);
+    return getSpriteFrame(this.spriteCharacter, anim.key, t);
+  }
+
+  // Screen-space rise while airborne, as a parabola peaking mid-jump. this.y
+  // (world-space lane depth) never changes from jumping — only the sprite's
+  // drawn height off the ground does, so the ground shadow stays anchored.
+  getJumpOffset() {
+    if (this.grounded || !this.hasAction('jump')) return 0;
+    const t = clamp(this.jumpTimer / PLAYER_JUMP_DURATION, 0, 1);
+    return Math.sin(t * Math.PI) * 34;
   }
 
   // cameraX: world-space camera offset; screen-space x = this.x - cameraX.
   // Defaults to 0 so callers that don't scroll (none left, but safe) still work.
   draw(ctx, cameraX = 0) {
     const sx = this.x - cameraX;
+    const jumpOffset = this.getJumpOffset();
     ctx.save();
     if (this.invuln > 0 && Math.floor(this.invuln / 3) % 2 === 0) {
       ctx.globalAlpha = 0.4;
@@ -221,9 +323,8 @@ class Player {
     if (spriteFrame) {
       const drawW = spriteFrame.sw;
       const drawH = spriteFrame.sh;
-      drawGroundShadow(ctx, sx, this.y, drawW);
       ctx.save();
-      ctx.translate(sx, this.y + this.z);
+      ctx.translate(sx, this.y - jumpOffset);
       ctx.scale(this.facing, 1);
       ctx.drawImage(
         spriteFrame.image,
@@ -232,7 +333,7 @@ class Player {
       );
       ctx.restore();
     } else {
-      drawHumanoid(ctx, sx, this.y + this.z, {
+      drawHumanoid(ctx, sx, this.y - jumpOffset, {
         walkPhase: this.walkPhase,
         action: this.action,
         facing: this.facing,

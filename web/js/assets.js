@@ -30,6 +30,39 @@ const CharacterSpriteSheets = {
     roll: 'gere_sprites/roll',
     hurt: 'gere_sprites/hurt',
     victory: 'gere_sprites/victory',
+    dance: 'gere_sprites/dance',
+    dash: 'gere_sprites/dash',
+    fall: 'gere_sprites/fall',
+    hitReact: 'gere_sprites/hit_react',
+  },
+  giovanni: {
+    idle: 'giovanni_sprites/idle_right',
+    walk: 'giovanni_sprites/walk_right',
+    run: 'giovanni_sprites/run_right',
+    kick: 'giovanni_sprites/kick',
+    attack: 'giovanni_sprites/attack_right',
+    jump: 'giovanni_sprites/jump_right',
+    roll: 'giovanni_sprites/roll',
+    dash: 'giovanni_sprites/dash',
+    dance: 'giovanni_sprites/dance',
+    fall: 'giovanni_sprites/fall',
+    victory: 'giovanni_sprites/victory',
+  },
+  giox: {
+    idle: 'giox_sprites/idle_right',
+    walk: 'giox_sprites/walk_right',
+    run: 'giox_sprites/run_right',
+    attack: 'giox_sprites/attack_right',
+    jump: 'giox_sprites/jump_right',
+    kick: 'giox_sprites/Kick',
+    shockwave: 'giox_sprites/Tennis Slam Dunk Shockwave',
+    slam: 'giox_sprites/Tennis racket smash',
+    hurt: 'giox_sprites/Hurt',
+    hitReact: 'giox_sprites/Hit React',
+    victory: 'giox_sprites/Victory',
+    dance: 'giox_sprites/Dance',
+    fall: 'giox_sprites/Fall',
+    wave: 'giox_sprites/Wave',
   },
   minion: {
     walk: 'minion_sprites/walk_right',
@@ -38,6 +71,7 @@ const CharacterSpriteSheets = {
     kick: 'minion_sprites/kick',
     shoot: 'minion_sprites/attack_right',
     jump: 'minion_sprites/jump_right',
+    idle: 'minion_sprites/idle_right',
   },
   carla: {
     walk: 'carla_sprites/walk_right',
@@ -51,6 +85,7 @@ const CharacterSpriteSheets = {
     kick: 'boss1_sprites/kick',
     shoot: 'boss1_sprites/attack_right',
     fall: 'boss1_sprites/fall',
+    idle: 'boss1_sprites/idle_right',
   },
 };
 
@@ -74,9 +109,10 @@ function loadJSON(src) {
 }
 
 function loadSpriteSheet(character, action, dir) {
+  const encodedDir = dir.split('/').map(encodeURIComponent).join('/');
   return Promise.all([
-    loadImage(`assets/release/${dir}/spritesheet.png`),
-    loadJSON(`assets/release/${dir}/atlas.json`),
+    loadImage(`assets/release/${encodedDir}/spritesheet.png`),
+    loadJSON(`assets/release/${encodedDir}/atlas.json`),
   ]).then(([image, atlas]) => {
     if (!image || !atlas) return;
     const frameKeys = Object.keys(atlas.frames).sort((a, b) => Number(a) - Number(b));
