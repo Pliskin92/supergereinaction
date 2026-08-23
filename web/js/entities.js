@@ -2,6 +2,9 @@
 
 const PLAYER_MOVE_SPEED = 0.3;
 const PLAYER_RUN_SPEED = 0.65;
+// Dodging (up/down within the fight lane) needs to be quick regardless of
+// Shift/run — always moves at this fixed speed rather than PLAYER_MOVE_SPEED.
+const PLAYER_DODGE_SPEED = 0.9;
 // Drawn under every character's feet (real sprite-sheet frames don't carry
 // their own ground shadow the way drawHumanoid's vector fallback does) so
 // they visually plant on the street instead of floating over it.
@@ -20,9 +23,10 @@ const PLAYER_HEAVY_DURATION = 28;
 const HIT_STUN_FRAMES = 14;
 const GERE_WALK_CYCLE_FRAMES = 140;
 
-const PLAYER_JUMP_SPEED = 3.6;
-const PLAYER_GRAVITY = 0.18;
-const PLAYER_JUMP_DURATION = 42;
+const PLAYER_JUMP_SPEED = 5.2;
+const PLAYER_GRAVITY = 0.34;
+const PLAYER_JUMP_DURATION = 30;
+const PLAYER_JUMP_PEAK_OFFSET = 74;
 
 const PlayerColors = {
   suit: Palette.suitBlack,
@@ -213,7 +217,9 @@ class Player {
 
         const speed = input.held.run ? PLAYER_RUN_SPEED : PLAYER_MOVE_SPEED;
         this.x += dx * speed;
-        this.y += dy * speed;
+        // Dodging (up/down within the fight lane) is always fast, independent
+        // of Shift/run — a beat-em-up player needs to sidestep attacks reliably.
+        this.y += dy * PLAYER_DODGE_SPEED;
 
         if (!this.grounded) {
           // Airborne: keep the jump clip playing regardless of horizontal input.
@@ -275,7 +281,7 @@ class Player {
   getJumpOffset() {
     if (this.grounded || !this.hasAction('jump')) return 0;
     const t = clamp(this.jumpTimer / PLAYER_JUMP_DURATION, 0, 1);
-    return Math.sin(t * Math.PI) * 34;
+    return Math.sin(t * Math.PI) * PLAYER_JUMP_PEAK_OFFSET;
   }
 
   // cameraX: world-space camera offset; screen-space x = this.x - cameraX.
