@@ -29,10 +29,19 @@ const GERE_WALK_CYCLE_FRAMES = 140;
 // jump_right's frames are uncropped 256x256 tiles with the character's
 // rise/fall/land baked into where they sit inside each tile — there's no
 // per-frame trim data to drive a separate screen-space arc from, so the
-// clip plays like any other move (punch/roll/heavy): straight through at a
-// fixed ground position, trusting the sprite's own authored motion instead
-// of layering invented physics on top of it.
-const PLAYER_JUMP_DURATION = 30;
+// clip plays like any other move (punch/roll/heavy): it trusts the
+// sprite's own authored motion instead of layering invented physics on
+// top of it. Unlike punch/roll/heavy, though, movement isn't locked while
+// it plays — held direction keys keep moving the player at normal
+// walk/run speed so a jump can go forward/back/sideways, not just up.
+//
+// Reference: SuperGere-jump.mp4 (in gere_sprites/jump_right/) plays the
+// full authored motion — quick crouch+launch, a long hang near the peak,
+// quick landing, then recovery to standing — over its native 2.333s.
+// 108 ticks (~1.8s) keeps that unmistakably-a-jump pacing (long hang, not
+// a fast symmetric hop) while trimming a bit off the tail so a jump
+// doesn't lock input for the full clip length in fast-paced combat.
+const PLAYER_JUMP_DURATION = 108;
 
 // A handful of sprite sheets were exported at the wrong scale relative to
 // the rest of that character's clips (measured by comparing each frame's
@@ -208,12 +217,10 @@ class Player {
 
       if (this.moveTimer > 0) this.moveTimer--;
 
+      const jumping = this.action === 'jump' && this.moveTimer > 0;
+
       if (this.action === 'slide' && this.moveTimer > 0) {
         this.x += this.vx;
-      } else if (this.action === 'jump' && this.moveTimer > 0) {
-        // Play the jump clip through in place — its own frames already
-        // depict the full crouch/rise/fall/land motion (see the comment on
-        // PLAYER_JUMP_DURATION above).
       } else {
         if (input.held.left) { dx--; this.facing = -1; }
         if (input.held.right) { dx++; this.facing = 1; }
@@ -226,7 +233,11 @@ class Player {
         // of Shift/run — a beat-em-up player needs to sidestep attacks reliably.
         this.y += dy * PLAYER_DODGE_SPEED;
 
-        if (dx !== 0 || dy !== 0) {
+        if (jumping) {
+          // Keep the jump clip/animTimer running regardless of movement —
+          // a jump can go forward/back/sideways, but it still plays out on
+          // its own timer rather than being cut short or extended by input.
+        } else if (dx !== 0 || dy !== 0) {
           this.action = input.held.run ? 'run' : 'walk';
           this.walkPhase += 0.35;
         } else if (this.moveTimer === 0) {
