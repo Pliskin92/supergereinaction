@@ -1,5 +1,11 @@
 module.exports = [
   {
+    // Vendored third-party builds (e.g. Phaser) aren't project source —
+    // linting a minified bundle is both wasteful and produces false
+    // positives from patterns that are fine in generated code.
+    ignores: ['web/js/vendor/**'],
+  },
+  {
     files: ['web/js/**/*.js', '.lint-bundle/**/*.js'],
     languageOptions: {
       ecmaVersion: 2022,
