@@ -2,15 +2,11 @@
 // Falls back gracefully: game logic never blocks on load, sprites.js vector
 // drawing is used automatically for anything not yet loaded.
 
-const AssetPaths = {
-  heroPortrait: 'assets/release/hero_portrait.png',
-  faceHappy: 'assets/release/face_happy.png',
-  faceSmirk: 'assets/release/face_smirk.png',
-  faceBigSmile: 'assets/release/face_bigsmile.png',
-  faceAngry: 'assets/release/face_angry.png',
-  streetLv1Example1: 'assets/release/street-lv1-example1.jpg',
-  streetLv1Example2: 'assets/release/street-lv1-example2.jpg',
-};
+// The portrait/face/background art these used to list has moved to
+// web/assets/private/ and isn't shipped. Nothing drew any of it — the
+// entries were loaded into Assets and then never read — so they are gone
+// rather than repointed; add entries back here when something needs them.
+const AssetPaths = {};
 
 // Multi-frame sprite-sheet animations, generated via AutoSprite (see
 // web/assets/release/<character>_sprites/<name>/{spritesheet.png,atlas.json}).
@@ -29,7 +25,9 @@ const CANONICAL_ACTIONS = [
   'hurt', 'hit_react', 'fall', 'victory', 'dance', 'wave',
 ];
 
-const PlayableCharacters = ['gere', 'giox', 'minion', 'boss1', 'carla', 'giovanni'];
+// giovanni's sprites have moved to web/assets/private/ and are no longer
+// shipped, so the character is not loaded here any more.
+const PlayableCharacters = ['gere', 'giox', 'minion', 'boss1', 'carla'];
 
 const CharacterSpriteSheets = {};
 for (const character of PlayableCharacters) {

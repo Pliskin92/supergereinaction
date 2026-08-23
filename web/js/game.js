@@ -92,8 +92,9 @@ let walkerDir = 1;
 
 function resetRun() {
   player = new Player(60, BOUNDS.bottom - 10);
+  // giovanni's sprites moved to web/assets/private/ and are no longer
+  // shipped, so that preview slot is gone.
   previewCharacters = [
-    new Player(180, BOUNDS.bottom - 10, 'giovanni', true),
     new Player(300, BOUNDS.bottom - 10, 'minion', true),
     new Player(420, BOUNDS.bottom - 10, 'boss1', true),
   ];
