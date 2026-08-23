@@ -133,7 +133,11 @@ class Player {
     if (this.hitStun > 0 || !this.grounded) return;
     if (!this.hasAction('slide')) return;
     if (this.moveTimer > 0 && this.action !== 'slide') return;
+    // Re-triggering while already sliding keeps the same action string, so
+    // update()'s action !== prevAction check never fires — reset animTimer
+    // explicitly or the sprite frame stays pinned wherever it was.
     this.action = 'slide';
+    this.animTimer = 0;
     this.moveTimer = PLAYER_SLIDE_DURATION;
     this.vx = this.facing * PLAYER_SLIDE_SPEED;
     this.attackHit = false;
