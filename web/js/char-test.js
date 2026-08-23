@@ -33,7 +33,12 @@ function charTestSetUp() {
 
   const select = document.getElementById('characterSelect');
   if (select) {
-    select.addEventListener('change', () => charTestSelectCharacter(select.value));
+    select.addEventListener('change', () => {
+      charTestSelectCharacter(select.value);
+      // Return keyboard focus to the page so arrows/WASD/number keys drive
+      // the viewer instead of being consumed by the still-focused <select>.
+      select.blur();
+    });
   }
 
   loadAssets().then(() => {
@@ -62,7 +67,10 @@ function charTestBuildButtons() {
     const btn = document.createElement('button');
     btn.textContent = `${i + 1}. ${action}`;
     btn.dataset.action = action;
-    btn.addEventListener('click', () => charTestSetAction(action));
+    btn.addEventListener('click', () => {
+      charTestSetAction(action);
+      btn.blur();
+    });
     wrap.appendChild(btn);
   });
 }

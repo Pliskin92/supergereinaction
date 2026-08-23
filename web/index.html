@@ -1,49 +1,139 @@
 <!doctype html>
-<html lang="en">
+<html lang="it">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Super Gere: Parise Rescue</title>
+<title>Gere al salvataggio della Famiglia Parise!</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&display=swap" rel="stylesheet">
 <style>
-  html, body {
+  :root {
+    --bg-color: #0d0c1d;
+    --card-bg: rgba(255, 255, 255, 0.05);
+    --accent-pink: #ff2a85;
+    --accent-yellow: #ffeb3b;
+    --accent-cyan: #00f5d4;
+    --accent-purple: #7b2cbf;
+  }
+
+  * {
+    box-sizing: border-box;
     margin: 0;
     padding: 0;
-    background: #0a0a12;
-    color: #eee;
-    font-family: 'Courier New', monospace;
-    overflow: hidden;
-    height: 100%;
   }
+
+  html, body {
+    height: 100%;
+    background-color: var(--bg-color);
+    background-image: 
+      radial-gradient(circle at 15% 20%, rgba(255, 42, 133, 0.25) 0%, transparent 40%),
+      radial-gradient(circle at 85% 80%, rgba(0, 245, 212, 0.2) 0%, transparent 40%),
+      radial-gradient(circle at 50% 50%, rgba(123, 44, 191, 0.2) 0%, transparent 60%);
+    color: #fff;
+    font-family: 'Outfit', system-ui, -apple-system, sans-serif;
+    overflow: hidden;
+  }
+
   #wrap {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     height: 100%;
-    gap: 8px;
+    padding: 16px;
+    gap: 16px;
   }
+
+  .title-container {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .badge {
+    background: linear-gradient(90deg, var(--accent-pink), var(--accent-purple));
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    padding: 4px 12px;
+    border-radius: 20px;
+    box-shadow: 0 0 12px rgba(255, 42, 133, 0.4);
+    animation: pulse 2s infinite alternate;
+  }
+
+  h1 {
+    font-size: clamp(1.4rem, 4vw, 2.5rem);
+    font-weight: 900;
+    text-transform: uppercase;
+    background: linear-gradient(135deg, #fff 0%, var(--accent-yellow) 50%, var(--accent-pink) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-shadow: 0 10px 20px rgba(0, 0, 0, 0.5);
+    letter-spacing: -0.5px;
+    line-height: 1.1;
+  }
+
+  .canvas-card {
+    position: relative;
+    background: var(--card-bg);
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    padding: 12px;
+    backdrop-filter: blur(12px);
+    box-shadow: 
+      0 20px 40px rgba(0, 0, 0, 0.6),
+      0 0 30px rgba(0, 245, 212, 0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
   #gameCanvas {
-    background: transparent;
+    background: #000;
+    border-radius: 12px;
     image-rendering: pixelated;
     image-rendering: crisp-edges;
-    /* Actively scale the canvas to fill available space (not just cap it)
-       while preserving its 480x270 (16:9) aspect ratio via width+height
-       set together, since max-width/max-height alone don't grow a canvas
-       past its intrinsic pixel size. */
-    width: min(96vw, 145.78vh);
-    height: min(82vh, 54vw);
+    width: min(90vw, 140vh);
+    height: min(70vh, 50.625vw);
+    box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.8);
+  }
+
+  .controls-hint {
+    font-size: 0.85rem;
+    color: var(--accent-cyan);
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    opacity: 0.9;
+  }
+
+  @keyframes pulse {
+    0% { transform: scale(1); }
+    100% { transform: scale(1.05); }
   }
 </style>
 </head>
 <body>
+
 <div id="wrap">
-  <canvas id="gameCanvas" width="480" height="270"></canvas>
+  <div class="title-container">
+    <span class="badge">✨ Arcade Edition ✨</span>
+    <h1>Gere al salvataggio della Famiglia Parise!</h1>
+  </div>
+
+  <div class="canvas-card">
+    <canvas id="gameCanvas" width="480" height="270"></canvas>
+  </div>
+
+  <div class="controls-hint">
+    🎮 Premi Start per Giocare 🎮
+  </div>
 </div>
 
-<script src="js/sprites.js"></script>
-<script src="js/assets.js"></script>
-<script src="js/entities.js"></script>
-<script src="js/levels.js"></script>
-<script src="js/game.js"></script>
 </body>
 </html>
