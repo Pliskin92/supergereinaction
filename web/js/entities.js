@@ -19,6 +19,38 @@ function drawGroundShadow(ctx, sx, y, spriteWidth) {
   ctx.fill();
   ctx.restore();
 }
+// Draws one sprite frame with its feet on the origin, applying the trim
+// data's per-clip scale (see scripts/build-sprite-trim.py).
+//
+// AutoSprite's atlas gives every clip an identical 256x256 tile, but the
+// character inside is drawn at a different size per clip and sits at a
+// different height within the tile. Blitting raw tiles therefore makes the
+// character change size and hover between actions. AutoSprite's own
+// preview looks consistent because it frames each clip on the character's
+// bounding box rather than the tile -- this does the same thing:
+//
+//   * sx/sy/sw/sh are already tightened to the character's real pixels, so
+//     the drawn box's bottom edge is the feet -- anchoring it at y=0 puts
+//     every clip on one baseline.
+//   * `scale` normalises this clip's character height against the
+//     character's reference height, so sizes match across actions.
+//   * `offsetX` preserves the pose's horizontal lean relative to the tile
+//     centre, so trimming doesn't snap a leaning pose sideways.
+//
+// The caller is expected to have already translated to the character's
+// feet and applied any facing flip.
+function drawSpriteFrame(ctx, frame) {
+  const scale = frame.scale || 1;
+  const drawW = frame.sw * scale;
+  const drawH = frame.sh * scale;
+  const dx = (frame.offsetX || 0) * scale;
+  ctx.drawImage(
+    frame.image,
+    frame.sx, frame.sy, frame.sw, frame.sh,
+    dx - drawW / 2, -drawH, drawW, drawH
+  );
+}
+
 const PLAYER_SLIDE_SPEED = 4.2;
 const PLAYER_COMBO_WINDOW = 22;
 const PLAYER_SLIDE_DURATION = 26;
@@ -42,16 +74,6 @@ const GERE_WALK_CYCLE_FRAMES = 140;
 // a fast symmetric hop) while trimming a bit off the tail so a jump
 // doesn't lock input for the full clip length in fast-paced combat.
 const PLAYER_JUMP_DURATION = 108;
-
-// A handful of sprite sheets were exported at the wrong scale relative to
-// the rest of that character's clips (measured by comparing each frame's
-// trimmed pixel bounding-box height against idle's) — e.g. gere's
-// jump_right renders the character ~25% shorter than every other gere
-// clip. This is a draw-time stopgap for known-bad clips until the
-// underlying spritesheet.png is re-exported at the correct scale.
-const SPRITE_SCALE_FIXUPS = {
-  gere: { jump: 1.335 },
-};
 
 const PlayerColors = {
   suit: Palette.suitBlack,
@@ -299,17 +321,10 @@ class Player {
     }
     const spriteFrame = this.getSpriteDraw();
     if (spriteFrame) {
-      const scale = SPRITE_SCALE_FIXUPS[this.spriteCharacter] && SPRITE_SCALE_FIXUPS[this.spriteCharacter][this.action] || 1;
-      const drawW = spriteFrame.sw * scale;
-      const drawH = spriteFrame.sh * scale;
       ctx.save();
       ctx.translate(sx, this.y);
       ctx.scale(this.facing, 1);
-      ctx.drawImage(
-        spriteFrame.image,
-        spriteFrame.sx, spriteFrame.sy, spriteFrame.sw, spriteFrame.sh,
-        -drawW / 2, -drawH, drawW, drawH
-      );
+      drawSpriteFrame(ctx, spriteFrame);
       ctx.restore();
     } else {
       drawHumanoid(ctx, sx, this.y, {
@@ -503,17 +518,11 @@ class Enemy {
     }
     const spriteFrame = this.getSpriteDraw();
     if (spriteFrame) {
-      const drawW = spriteFrame.sw;
-      const drawH = spriteFrame.sh;
-      drawGroundShadow(ctx, sx, this.y, drawW);
+      drawGroundShadow(ctx, sx, this.y, spriteFrame.sw * (spriteFrame.scale || 1));
       ctx.save();
       ctx.translate(sx, this.y);
       ctx.scale(this.facing, 1);
-      ctx.drawImage(
-        spriteFrame.image,
-        spriteFrame.sx, spriteFrame.sy, spriteFrame.sw, spriteFrame.sh,
-        -drawW / 2, -drawH, drawW, drawH
-      );
+      drawSpriteFrame(ctx, spriteFrame);
       ctx.restore();
     } else {
       drawHumanoid(ctx, sx, this.y, {
@@ -678,17 +687,11 @@ class NPC {
     ctx.save();
     const spriteFrame = this.getSpriteDraw();
     if (spriteFrame) {
-      const drawW = spriteFrame.sw;
-      const drawH = spriteFrame.sh;
-      drawGroundShadow(ctx, sx, this.y, drawW);
+      drawGroundShadow(ctx, sx, this.y, spriteFrame.sw * (spriteFrame.scale || 1));
       ctx.save();
       ctx.translate(sx, this.y);
       ctx.scale(this.facing, 1);
-      ctx.drawImage(
-        spriteFrame.image,
-        spriteFrame.sx, spriteFrame.sy, spriteFrame.sw, spriteFrame.sh,
-        -drawW / 2, -drawH, drawW, drawH
-      );
+      drawSpriteFrame(ctx, spriteFrame);
       ctx.restore();
     } else {
       drawHumanoid(ctx, sx, this.y, {
