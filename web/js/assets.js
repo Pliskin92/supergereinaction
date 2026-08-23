@@ -11,7 +11,12 @@ const AssetPaths = {
   facePlatinumAngry: 'assets/face_platinum_angry.png',
   facePlatinumShout: 'assets/face_platinum_shout.png',
   // Level fight backgrounds: the street outside each relative's house.
-  streetGrandma: 'assets/street_grandma.jpg',
+  // Grandma Carla's street has 4 distinct segments (the street visibly
+  // progresses toward her house); the rest still use one repeated image.
+  streetGrandmaSeg1: 'assets/street_grandma_seg1.jpg',
+  streetGrandmaSeg2: 'assets/street_grandma_seg2.jpg',
+  streetGrandmaSeg3: 'assets/street_grandma_seg3.jpg',
+  streetGrandmaSeg4: 'assets/street_grandma_seg4.jpg',
   streetGrandpa: 'assets/street_grandpa.jpg',
   streetMattia: 'assets/street_mattia.jpg',
   streetMichele: 'assets/street_michele.jpg',

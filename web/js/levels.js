@@ -24,7 +24,9 @@ const LevelDefs = [
     id: 'grandma_carla',
     name: 'Grandma Carla’s Street',
     bg: ['#3b2a1f', '#5c4530'],
-    bgImage: 'streetGrandma',
+    // 4 distinct segments, one per screen, so the street visibly progresses
+    // toward Grandma Carla's house (segment 4) instead of repeating one image.
+    bgImages: ['streetGrandmaSeg1', 'streetGrandmaSeg2', 'streetGrandmaSeg3', 'streetGrandmaSeg4'],
     shopImage: 'shopGrandmaKitchen',
     worldWidth: DEFAULT_WORLD_WIDTH,
     waves: [
@@ -144,12 +146,16 @@ class LevelRuntime {
       : null;
   }
 
-  // Placeholder segment list: the same bgImage key repeated across the level
-  // width. Swap this for a real per-segment array (e.g. def.bgImages, one
-  // key per screen) once distinct segment art exists — everything else
-  // (tiling/scrolling in game.js) already treats backgrounds as a list.
+  // Returns one background image key per on-screen segment. Levels with a
+  // def.bgImages array (distinct art per segment, e.g. a street that
+  // visibly progresses toward its destination house) use those directly;
+  // levels that only have a single def.bgImage repeat it as a placeholder
+  // until real per-segment art exists.
   backgroundSegments() {
     const segments = Math.max(1, Math.ceil(this.worldWidth / SCREEN_W));
+    if (this.def.bgImages && this.def.bgImages.length > 0) {
+      return Array.from({ length: segments }, (_, i) => this.def.bgImages[Math.min(i, this.def.bgImages.length - 1)]);
+    }
     const key = this.def.bgImage || null;
     return Array.from({ length: segments }, () => key);
   }

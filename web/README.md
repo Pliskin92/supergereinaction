@@ -41,8 +41,10 @@ python3 -m http.server 8080
 
 Family members are **rescued, not fought** — level 1 (the only one reworked
 so far) fights through waves of a robotic minion and a boss villain (both
-original designs, not family members), then Grandma Carla appears near the
-end of the street once the boss falls. Reach her and she's rescued (a
+original designs, not family members) down a street that visibly progresses
+toward Grandma Carla's house across 4 distinct background segments, arriving
+at her warm, flower-covered front door in the final one. She appears near
+the end of the street once the boss falls; reach her and she's rescued (a
 floating "Grandma Carla is safe!" + score bump), which is what actually
 unlocks the shop/next-level transition — clearing the boss alone isn't
 enough. Levels 2-6 haven't been converted to this rescue structure yet and
@@ -128,6 +130,13 @@ node --env-file=.env scripts/generate-sprite.js \
 Output lands in `scripts/generated/` (gitignored) as a raw PNG. Review it,
 then move/rename the result into [assets/](assets/) before wiring it into
 the game (see `AssetPaths` in [js/assets.js](js/assets.js)).
+
+A level can use either one repeated background (`LevelDefs[i].bgImage`, a
+single key) or a real per-segment progression (`LevelDefs[i].bgImages`, an
+array with one key per on-screen segment — see level 1's 4-segment street
+in [js/levels.js](js/levels.js) for the pattern). `LevelRuntime.backgroundSegments()`
+prefers `bgImages` when present and falls back to repeating `bgImage`
+otherwise.
 
 ## Code layout
 
