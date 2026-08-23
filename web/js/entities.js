@@ -1,6 +1,23 @@
 // Entity logic: player, enemies, assists. Ported/expanded from the PSn00bSDK C scaffold.
 
-const PLAYER_MOVE_SPEED = 1.6;
+const PLAYER_MOVE_SPEED = 1.0;
+// Sprite draw height for all characters (player, enemies, NPCs), in canvas
+// px. Canvas is 270px tall; characters should read as a clear foreground
+// presence without dominating the whole fight lane (which spans roughly
+// the bottom half of the canvas — see BOUNDS in game.js).
+const CHARACTER_SPRITE_HEIGHT = 72;
+
+// Drawn under every character's feet (real sprite-sheet frames don't carry
+// their own ground shadow the way drawHumanoid's vector fallback does) so
+// they visually plant on the street instead of floating over it.
+function drawGroundShadow(ctx, sx, y) {
+  ctx.save();
+  ctx.fillStyle = 'rgba(0,0,0,0.35)';
+  ctx.beginPath();
+  ctx.ellipse(sx, y + 3, CHARACTER_SPRITE_HEIGHT * 0.22, CHARACTER_SPRITE_HEIGHT * 0.07, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
 const PLAYER_SLIDE_SPEED = 4.2;
 const PLAYER_COMBO_WINDOW = 22;
 const PLAYER_SLIDE_DURATION = 26;
@@ -233,7 +250,8 @@ class Player {
 
     const spriteFrame = this.getSpriteDraw();
     if (spriteFrame) {
-      const drawH = 52;
+      drawGroundShadow(ctx, sx, this.y);
+      const drawH = CHARACTER_SPRITE_HEIGHT;
       const drawW = spriteFrame.sw * (drawH / spriteFrame.sh);
       ctx.save();
       ctx.translate(sx, this.y + this.z);
@@ -438,7 +456,8 @@ class Enemy {
     }
     const spriteFrame = this.getSpriteDraw();
     if (spriteFrame) {
-      const drawH = 52;
+      drawGroundShadow(ctx, sx, this.y);
+      const drawH = CHARACTER_SPRITE_HEIGHT;
       const drawW = spriteFrame.sw * (drawH / spriteFrame.sh);
       ctx.save();
       ctx.translate(sx, this.y);
@@ -612,7 +631,8 @@ class NPC {
     ctx.save();
     const spriteFrame = this.getSpriteDraw();
     if (spriteFrame) {
-      const drawH = 52;
+      drawGroundShadow(ctx, sx, this.y);
+      const drawH = CHARACTER_SPRITE_HEIGHT;
       const drawW = spriteFrame.sw * (drawH / spriteFrame.sh);
       ctx.save();
       ctx.translate(sx, this.y);

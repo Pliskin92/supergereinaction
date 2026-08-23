@@ -7,9 +7,12 @@ const H = canvas.height;
 
 // BOUNDS.left/right are the vertical-lane fight box's screen margins, kept
 // for reference/UI; horizontal movement clamping is now done in world space
-// (see worldBounds()) since levels scroll. top/bottom (the fight lane) are
-// still screen-space-equivalent because the lane doesn't scroll vertically.
-const BOUNDS = { left: 24, right: W - 24, top: H - 90, bottom: H - 30 };
+// (see worldBounds()) since levels scroll. top/bottom (the fight lane) span
+// roughly the bottom half of the canvas, matching backgrounds composed with
+// the street/sidewalk ground plane occupying that same region (buildings
+// fill the top half) so characters' feet visually land on the pavement
+// instead of floating over architecture.
+const BOUNDS = { left: 24, right: W - 24, top: H * 0.5, bottom: H - 30 };
 
 let cameraX = 0;
 
@@ -58,7 +61,6 @@ window.addEventListener('keydown', (e) => {
     if (e.key === 'j' || e.key === 'J') Input.pressed.punch = true;
     if (e.key === 'k' || e.key === 'K') Input.pressed.slide = true;
     if (e.key === ' ') Input.pressed.jump = true;
-    if (e.key === 'l' || e.key === 'L') triggerAssist();
     if (e.key === 'p' || e.key === 'P') togglePause();
     if (e.key === 'Enter') handleConfirm();
   }
@@ -295,45 +297,36 @@ function drawLevelBackground(colors, runtime) {
 }
 
 function drawHUD() {
-  // Face portrait
+  // Face portrait, above the HP bar
   const face = player.platinum ? Assets.facePlatinumAngry : Assets.faceHappy;
+  const faceSize = 34;
+  const faceTop = 10;
   if (face) {
-    const size = 34;
     ctx.save();
     ctx.beginPath();
-    ctx.arc(10 + size / 2, 52 + size / 2, size / 2, 0, Math.PI * 2);
+    ctx.arc(10 + faceSize / 2, faceTop + faceSize / 2, faceSize / 2, 0, Math.PI * 2);
     ctx.clip();
-    ctx.drawImage(face, 10, 52, size, size);
+    ctx.drawImage(face, 10, faceTop, faceSize, faceSize);
     ctx.restore();
     ctx.strokeStyle = player.platinum ? '#8fe8ff' : '#000';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.arc(10 + size / 2, 52 + size / 2, size / 2, 0, Math.PI * 2);
+    ctx.arc(10 + faceSize / 2, faceTop + faceSize / 2, faceSize / 2, 0, Math.PI * 2);
     ctx.stroke();
   }
 
-  // HP bar
+  // HP bar, below the face portrait
+  const hpTop = faceTop + faceSize + 6;
   ctx.fillStyle = 'rgba(0,0,0,0.5)';
-  ctx.fillRect(10, 10, 140, 14);
+  ctx.fillRect(10, hpTop, 140, 14);
   ctx.fillStyle = '#3fd67a';
-  ctx.fillRect(12, 12, 136 * (player.hp / player.maxHp), 10);
+  ctx.fillRect(12, hpTop + 2, 136 * (player.hp / player.maxHp), 10);
   ctx.strokeStyle = '#000';
-  ctx.strokeRect(10, 10, 140, 14);
+  ctx.strokeRect(10, hpTop, 140, 14);
   ctx.fillStyle = '#fff';
   ctx.font = '9px monospace';
   ctx.textAlign = 'left';
-  ctx.fillText('HP', 14, 21);
-
-  // Fury / Platinum bar
-  ctx.fillStyle = 'rgba(0,0,0,0.5)';
-  ctx.fillRect(10, 28, 140, 10);
-  ctx.fillStyle = player.platinum ? '#8fe8ff' : '#ffd15c';
-  ctx.fillRect(12, 30, 136 * (player.fury / 100), 6);
-  ctx.strokeStyle = '#000';
-  ctx.strokeRect(10, 28, 140, 10);
-  ctx.fillStyle = '#fff';
-  ctx.font = '8px monospace';
-  ctx.fillText(player.platinum ? 'PLATINUM STATE!' : 'FURY', 14, 36);
+  ctx.fillText('HP', 14, hpTop + 11);
 
   // score / gold
   ctx.textAlign = 'right';
@@ -347,13 +340,6 @@ function drawHUD() {
   ctx.fillStyle = 'rgba(255,255,255,0.7)';
   ctx.font = '9px monospace';
   ctx.fillText(level ? level.def.name : '', W / 2, 16);
-
-  // assist hint
-  if (player.platinum) {
-    ctx.fillStyle = '#8fe8ff';
-    ctx.font = '9px monospace';
-    ctx.fillText('Press L to call an Uncle!', W / 2, H - 8);
-  }
 
   for (const f of floatTexts) {
     ctx.globalAlpha = 1 - f.t / 90;
