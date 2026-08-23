@@ -105,14 +105,22 @@ function loadAssets() {
 // fall back to procedural drawing).
 //
 // Without trim data the result is the raw grid tile: { image, sx, sy, sw,
-// sh, scale: 1, offsetX: 0 }. With it (see scripts/build-sprite-trim.py)
-// sx/sy/sw/sh are tightened to the character's actual pixels and `scale`
-// normalises this clip against the character's reference height, so every
-// action draws the character at a consistent size. Callers anchor the
-// result at the character's feet: the trimmed box's bottom edge IS the
-// baseline, which is what stops clips from hovering at different heights.
-// `offsetX` re-centres the trimmed box against the tile's centre so a
-// pose that leans left/right doesn't teleport the character sideways.
+// sh, offsetX: 0, lift: 0 }. With it (see scripts/build-sprite-trim.py):
+//
+//   * sx/sy/sw/sh are tightened to the character's actual pixels, so the
+//     box's bottom edge is the character's feet — callers anchor there,
+//     which stops clips from hovering at different heights in their tiles.
+//   * `lift` is how far this frame's feet sit above the clip's own ground
+//     line. Airborne frames encode real vertical motion this way (gere's
+//     jump rises 72px), so it must be preserved — anchoring every frame
+//     flat to the ground would pin a jumping character to the floor.
+//   * `offsetX` re-centres the trimmed box against the tile's centre so a
+//     pose that leans left/right doesn't teleport the character sideways.
+//
+// Sprites are drawn at their authored size: trim.json's `scale` (which
+// would normalise every clip to a common character height) is deliberately
+// NOT applied — the size differences between clips are a source-art issue
+// to be fixed in the sprite sheets themselves, not compensated for here.
 function getSpriteFrame(character, action, t) {
   const anim = SpriteAnims[character] && SpriteAnims[character][action];
   if (!anim || anim.frames.length === 0) return null;
@@ -121,17 +129,15 @@ function getSpriteFrame(character, action, t) {
 
   const trim = anim.trim && anim.trim.frames && anim.trim.frames[String(idx)];
   if (!trim) {
-    return { image: anim.image, sx: f.x, sy: f.y, sw: f.w, sh: f.h, scale: 1, offsetX: 0 };
+    return { image: anim.image, sx: f.x, sy: f.y, sw: f.w, sh: f.h, offsetX: 0, lift: 0 };
   }
-  const scale = anim.trim.scale || 1;
   return {
     image: anim.image,
     sx: f.x + trim.x,
     sy: f.y + trim.y,
     sw: trim.w,
     sh: trim.h,
-    scale,
-    // Trimmed-box centre relative to the tile centre, pre-scale.
     offsetX: (trim.x + trim.w / 2) - f.w / 2,
+    lift: trim.lift || 0,
   };
 }

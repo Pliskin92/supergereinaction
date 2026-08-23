@@ -19,43 +19,48 @@ function drawGroundShadow(ctx, sx, y, spriteWidth) {
   ctx.fill();
   ctx.restore();
 }
-// Draws one sprite frame with its feet on the origin, applying the trim
-// data's per-clip scale (see scripts/build-sprite-trim.py).
+// Draws one sprite frame at its authored size with its feet on the origin.
 //
-// AutoSprite's atlas gives every clip an identical 256x256 tile, but the
-// character inside is drawn at a different size per clip and sits at a
-// different height within the tile. Blitting raw tiles therefore makes the
-// character change size and hover between actions. AutoSprite's own
-// preview looks consistent because it frames each clip on the character's
-// bounding box rather than the tile -- this does the same thing:
+// AutoSprite's atlas gives every clip an identical 256x256 tile, and the
+// character sits at a different height inside it per clip, so blitting raw
+// tiles makes some clips hover above the ground. The trim data (see
+// scripts/build-sprite-trim.py) tightens sx/sy/sw/sh to the character's
+// real pixels, so the drawn box's bottom edge is the feet — anchoring it
+// at y=0 puts every clip's resting pose on one baseline.
 //
-//   * sx/sy/sw/sh are already tightened to the character's real pixels, so
-//     the drawn box's bottom edge is the feet -- anchoring it at y=0 puts
-//     every clip on one baseline.
-//   * `scale` normalises this clip's character height against the
-//     character's reference height, so sizes match across actions.
-//   * `offsetX` preserves the pose's horizontal lean relative to the tile
-//     centre, so trimming doesn't snap a leaning pose sideways.
+// `lift` is then added back: it's how far a frame's feet rise above that
+// clip's own ground line, which is where an airborne pose's height lives
+// (gere's jump rises 72px this way). Without it a jumping character stays
+// glued to the floor. `offsetX` preserves the pose's horizontal lean
+// relative to the tile centre, so trimming doesn't snap a pose sideways.
+//
+// No scaling is applied: sprites render at whatever size they were drawn.
 //
 // The caller is expected to have already translated to the character's
 // feet and applied any facing flip.
 function drawSpriteFrame(ctx, frame) {
-  const scale = frame.scale || 1;
-  const drawW = frame.sw * scale;
-  const drawH = frame.sh * scale;
-  const dx = (frame.offsetX || 0) * scale;
+  const dx = frame.offsetX || 0;
+  const lift = frame.lift || 0;
   ctx.drawImage(
     frame.image,
     frame.sx, frame.sy, frame.sw, frame.sh,
-    dx - drawW / 2, -drawH, drawW, drawH
+    dx - frame.sw / 2, -frame.sh - lift, frame.sw, frame.sh
   );
 }
 
 const PLAYER_SLIDE_SPEED = 4.2;
-const PLAYER_COMBO_WINDOW = 22;
-const PLAYER_SLIDE_DURATION = 26;
-const PLAYER_HEAVY_DURATION = 28;
-const HIT_STUN_FRAMES = 14;
+
+// Every AutoSprite clip is 25 frames, and getSpriteDraw() spreads a clip
+// across its action's hold window. So an action given fewer than 25 ticks
+// physically cannot show every frame -- it drops some, which reads as a
+// jerky, stuttering animation. These were previously 22 (punch/kick, ~3
+// frames dropped) and 14 (hurt, nearly half the clip dropped); each is now
+// at least 25 so the whole clip actually plays.
+const SPRITE_CLIP_FRAMES = 25;
+const PLAYER_COMBO_WINDOW = 28;
+const PLAYER_SLIDE_DURATION = 28;
+const PLAYER_HEAVY_DURATION = 30;
+const HIT_STUN_FRAMES = 26;
 const GERE_WALK_CYCLE_FRAMES = 140;
 
 // jump_right's frames are uncropped 256x256 tiles with the character's
@@ -304,7 +309,13 @@ class Player {
   getSpriteDraw() {
     const anim = this.animationMap[this.action];
     if (!anim) return null;
-    const holdFrames = anim.loop ? anim.cycleFrames : anim.holdFrames;
+    // A non-looping clip spread over fewer ticks than it has frames can't
+    // show them all, so it visibly stutters. Stretch the playback window to
+    // at least one tick per frame; the action's own timer still governs how
+    // long it locks input, this only affects which frame is drawn.
+    const holdFrames = anim.loop
+      ? anim.cycleFrames
+      : Math.max(anim.holdFrames, SPRITE_CLIP_FRAMES);
     const t = anim.loop
       ? (this.animTimer % holdFrames) / holdFrames
       : clamp(this.animTimer / holdFrames, 0, 0.999);
@@ -518,7 +529,7 @@ class Enemy {
     }
     const spriteFrame = this.getSpriteDraw();
     if (spriteFrame) {
-      drawGroundShadow(ctx, sx, this.y, spriteFrame.sw * (spriteFrame.scale || 1));
+      drawGroundShadow(ctx, sx, this.y, spriteFrame.sw);
       ctx.save();
       ctx.translate(sx, this.y);
       ctx.scale(this.facing, 1);
@@ -687,7 +698,7 @@ class NPC {
     ctx.save();
     const spriteFrame = this.getSpriteDraw();
     if (spriteFrame) {
-      drawGroundShadow(ctx, sx, this.y, spriteFrame.sw * (spriteFrame.scale || 1));
+      drawGroundShadow(ctx, sx, this.y, spriteFrame.sw);
       ctx.save();
       ctx.translate(sx, this.y);
       ctx.scale(this.facing, 1);

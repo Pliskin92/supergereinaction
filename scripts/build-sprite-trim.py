@@ -185,6 +185,13 @@ def main():
             if check_only:
                 continue
 
+            # The clip's ground line: the lowest the feet ever reach. Frames
+            # whose feet sit above it are genuinely airborne -- jump encodes
+            # ~72px of real vertical motion this way -- so `lift` records
+            # that gap and lets the renderer raise those frames off the
+            # ground instead of flattening every frame onto one line.
+            ground = max(by1 for (_, _, _, by1) in clip["boxes"].values())
+
             frames = {}
             for index, (bx0, by0, bx1, by1) in sorted(clip["boxes"].items()):
                 frames[str(index)] = {
@@ -193,11 +200,13 @@ def main():
                     "w": bx1 - bx0,
                     "h": by1 - by0,
                     "baseline": by1,
+                    "lift": ground - by1,
                 }
             payload = {
                 "reference_height": round(reference, 2),
                 "clip_height": round(clip["height"], 2),
                 "scale": round(scale, 4),
+                "ground": ground,
                 "frames": frames,
             }
             with open(os.path.join(clip["path"], "trim.json"), "w") as fh:
