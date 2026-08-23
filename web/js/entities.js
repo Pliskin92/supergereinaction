@@ -1,10 +1,13 @@
 // Entity logic: player, enemies, assists. Ported/expanded from the PSn00bSDK C scaffold.
 
-const PLAYER_MOVE_SPEED = 0.3;
-const PLAYER_RUN_SPEED = 0.65;
+// Distance covered per tick while walking/running. Previously 0.3/0.65 —
+// too slow to match the walk animation's stride cadence, so the character
+// looked like it was shuffling/sliding in place rather than covering ground.
+const PLAYER_MOVE_SPEED = 1.1;
+const PLAYER_RUN_SPEED = 2.2;
 // Dodging (up/down within the fight lane) needs to be quick regardless of
 // Shift/run — always moves at this fixed speed rather than PLAYER_MOVE_SPEED.
-const PLAYER_DODGE_SPEED = 0.9;
+const PLAYER_DODGE_SPEED = 2.6;
 // Drawn under every character's feet (real sprite-sheet frames don't carry
 // their own ground shadow the way drawHumanoid's vector fallback does) so
 // they visually plant on the street instead of floating over it.
@@ -23,10 +26,13 @@ const PLAYER_HEAVY_DURATION = 28;
 const HIT_STUN_FRAMES = 14;
 const GERE_WALK_CYCLE_FRAMES = 140;
 
-const PLAYER_JUMP_SPEED = 5.2;
-const PLAYER_GRAVITY = 0.34;
+// jump_right's frames are uncropped 256x256 tiles with the character's
+// rise/fall/land baked into where they sit inside each tile — there's no
+// per-frame trim data to drive a separate screen-space arc from, so the
+// clip plays like any other move (punch/roll/heavy): straight through at a
+// fixed ground position, trusting the sprite's own authored motion instead
+// of layering invented physics on top of it.
 const PLAYER_JUMP_DURATION = 30;
-const PLAYER_JUMP_PEAK_OFFSET = 74;
 
 const PlayerColors = {
   suit: Palette.suitBlack,
@@ -67,7 +73,6 @@ class Player {
     this.x = x;
     this.y = y;
     this.vx = 0;
-    this.vy = 0;
     this.facing = 1;
     this.spriteCharacter = spriteCharacter;
     this.animationMap = movementOnly ? PREVIEW_ANIM_MAP : PLAYER_ANIM_MAP;
@@ -85,9 +90,6 @@ class Player {
     this.slingShot = false;
     this.animTimer = 0; // frames elapsed in the current action, for sprite-sheet playback
     this.prevAction = 'idle';
-    this.vy = 0;
-    this.jumpTimer = 0;
-    this.grounded = true;
   }
 
   // Whether this character actually has a loaded sprite sheet for the given
@@ -105,16 +107,15 @@ class Player {
   }
 
   startJump() {
-    if (this.hitStun > 0 || !this.grounded) return;
+    if (this.hitStun > 0 || this.moveTimer > 0) return;
     if (!this.hasAction('jump')) return;
     this.action = 'jump';
-    this.jumpTimer = PLAYER_JUMP_DURATION;
-    this.vy = -PLAYER_JUMP_SPEED;
-    this.grounded = false;
+    this.animTimer = 0;
+    this.moveTimer = PLAYER_JUMP_DURATION;
   }
 
   startHeavy() {
-    if (this.hitStun > 0 || this.moveTimer > 0 || !this.grounded) return;
+    if (this.hitStun > 0 || this.moveTimer > 0) return;
     if (!this.hasAction('heavy')) return;
     this.action = 'heavy';
     this.moveTimer = PLAYER_HEAVY_DURATION;
@@ -122,7 +123,7 @@ class Player {
   }
 
   startPunchCombo() {
-    if (this.hitStun > 0 || !this.grounded) return;
+    if (this.hitStun > 0) return;
     if (!this.hasAction('punch1')) return;
     if (this.moveTimer > 0 && this.action === 'slide') return;
     if (this.moveTimer === 0) this.comboStep = 0;
@@ -134,7 +135,7 @@ class Player {
   }
 
   startKneeSlide() {
-    if (this.hitStun > 0 || !this.grounded) return;
+    if (this.hitStun > 0) return;
     if (!this.hasAction('slide')) return;
     if (this.moveTimer > 0 && this.action !== 'slide') return;
     // Re-triggering while already sliding keeps the same action string, so
@@ -197,18 +198,12 @@ class Player {
 
       if (this.moveTimer > 0) this.moveTimer--;
 
-      if (!this.grounded) {
-        this.jumpTimer--;
-        this.vy += PLAYER_GRAVITY;
-        if (this.jumpTimer <= 0 || this.vy >= PLAYER_JUMP_SPEED) {
-          this.grounded = true;
-          this.vy = 0;
-          this.action = 'idle';
-        }
-      }
-
       if (this.action === 'slide' && this.moveTimer > 0) {
         this.x += this.vx;
+      } else if (this.action === 'jump' && this.moveTimer > 0) {
+        // Play the jump clip through in place — its own frames already
+        // depict the full crouch/rise/fall/land motion (see the comment on
+        // PLAYER_JUMP_DURATION above).
       } else {
         if (input.held.left) { dx--; this.facing = -1; }
         if (input.held.right) { dx++; this.facing = 1; }
@@ -221,9 +216,7 @@ class Player {
         // of Shift/run — a beat-em-up player needs to sidestep attacks reliably.
         this.y += dy * PLAYER_DODGE_SPEED;
 
-        if (!this.grounded) {
-          // Airborne: keep the jump clip playing regardless of horizontal input.
-        } else if (dx !== 0 || dy !== 0) {
+        if (dx !== 0 || dy !== 0) {
           this.action = input.held.run ? 'run' : 'walk';
           this.walkPhase += 0.35;
         } else if (this.moveTimer === 0) {
@@ -275,20 +268,10 @@ class Player {
     return getSpriteFrame(this.spriteCharacter, anim.key, t);
   }
 
-  // Screen-space rise while airborne, as a parabola peaking mid-jump. this.y
-  // (world-space lane depth) never changes from jumping — only the sprite's
-  // drawn height off the ground does, so the ground shadow stays anchored.
-  getJumpOffset() {
-    if (this.grounded || !this.hasAction('jump')) return 0;
-    const t = clamp(this.jumpTimer / PLAYER_JUMP_DURATION, 0, 1);
-    return Math.sin(t * Math.PI) * PLAYER_JUMP_PEAK_OFFSET;
-  }
-
   // cameraX: world-space camera offset; screen-space x = this.x - cameraX.
   // Defaults to 0 so callers that don't scroll (none left, but safe) still work.
   draw(ctx, cameraX = 0) {
     const sx = this.x - cameraX;
-    const jumpOffset = this.getJumpOffset();
     ctx.save();
     if (this.invuln > 0 && Math.floor(this.invuln / 3) % 2 === 0) {
       ctx.globalAlpha = 0.4;
@@ -298,7 +281,7 @@ class Player {
       const drawW = spriteFrame.sw;
       const drawH = spriteFrame.sh;
       ctx.save();
-      ctx.translate(sx, this.y - jumpOffset);
+      ctx.translate(sx, this.y);
       ctx.scale(this.facing, 1);
       ctx.drawImage(
         spriteFrame.image,
@@ -307,7 +290,7 @@ class Player {
       );
       ctx.restore();
     } else {
-      drawHumanoid(ctx, sx, this.y - jumpOffset, {
+      drawHumanoid(ctx, sx, this.y, {
         walkPhase: this.walkPhase,
         action: this.action,
         facing: this.facing,
