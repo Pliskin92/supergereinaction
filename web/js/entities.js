@@ -17,6 +17,7 @@ const PLAYER_COMBO_WINDOW = 22;
 const PLAYER_SLIDE_DURATION = 26;
 const PLAYER_SLING_DURATION = 28;
 const HIT_STUN_FRAMES = 14;
+const GERE_WALK_CYCLE_FRAMES = 140;
 
 const PlayerColors = {
   suit: Palette.suitBlack,
@@ -29,7 +30,7 @@ const PlayerColors = {
 
 const PLAYER_ANIM_MAP = {
   idle: { key: 'idle', loop: true, cycleFrames: 80 },
-  walk: { key: 'walk', loop: true, cycleFrames: 48 },
+  walk: { key: 'walk', loop: true, cycleFrames: GERE_WALK_CYCLE_FRAMES },
   punch1: { key: 'punch', loop: false, holdFrames: PLAYER_COMBO_WINDOW },
   punch2: { key: 'punch', loop: false, holdFrames: PLAYER_COMBO_WINDOW },
   punch3: { key: 'kick', loop: false, holdFrames: PLAYER_COMBO_WINDOW },
