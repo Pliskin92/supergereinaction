@@ -2,4 +2,3 @@ node_modules/
 .lint-bundle/
 *.log
 .env
-scripts/generated/
