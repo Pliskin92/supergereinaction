@@ -65,11 +65,6 @@ function update() {
 
 function draw() {
   ctx.clearRect(0, 0, W, H);
-  ctx.strokeStyle = '#2a2a3a';
-  ctx.beginPath();
-  ctx.moveTo(0, BOUNDS.top);
-  ctx.lineTo(W, BOUNDS.top);
-  ctx.stroke();
   player.draw(ctx, 0);
 }
 
