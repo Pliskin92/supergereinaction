@@ -98,9 +98,9 @@ const PLAYER_SLIDE_DURATION = 28;
 const FURY_MAX = 100;
 const FURY_GAIN_PER_HIT = 1;
 const FURY_ACTIVE_FRAMES = 20 * 60; // 20 seconds at 60fps
-// Transformed, every attack hits three times as hard. Applied centrally in
+// Transformed, every attack hits twice as hard. Applied centrally in
 // Player.attackBox so no individual move can miss out on it.
-const FURY_DAMAGE_MULTIPLIER = 3;
+const FURY_DAMAGE_MULTIPLIER = 2;
 // Transformed, incoming damage is divided by this -- doubled defence.
 const FURY_DEFENCE_MULTIPLIER = 2;
 const PLAYER_FURY_CHARACTER = 'supergere';
@@ -117,22 +117,31 @@ const PLAYER_HEAVY_DAMAGE = 14;
 // through rather than both landing on one frame.
 const PLAYER_HEAVY_HIT_GAP = 9;
 const HIT_STUN_FRAMES = 26;
+// Immunity after taking a hit, so a crowd cannot delete you in one frame.
+const PLAYER_INVULN_FRAMES = 20;
 // A whole enemy walk clip, in ticks. The sheets are 25 frames, so this is
 // how long one full stride takes: low values read as a frantic shuffle.
 const ENEMY_WALK_CYCLE_FRAMES = 110;
 // How long an enemy's attack clip plays, and how far into it the blow
 // actually lands -- damage is dealt at the contact frame, not on the first
 // frame of the wind-up.
-const ENEMY_ATTACK_FRAMES = 30;
-const ENEMY_ATTACK_STRIKE_TICK = 14;
+const ENEMY_ATTACK_FRAMES = 20;
+const ENEMY_ATTACK_STRIKE_TICK = 9;
 // contactRange values are how close an enemy must be to swing. They were
 // authored when characters were ~60px tall; the sprites are now ~180px, so
 // a 14px range meant a minion had to stand almost inside the player before
 // it would ever attack -- it just walked into you forever.
 //
-// Pause between attacks once in range, so an enemy in your face does not
-// chain blows with no gap to punish.
-const ENEMY_ATTACK_COOLDOWN = 46;
+// Enemies attack in short bursts rather than single isolated blows: once
+// they have closed the distance they throw a flurry, then back off for a
+// beat. That gives an opening to punish without letting them chip away at
+// you one endless jab at a time.
+const ENEMY_COMBO_MIN = 2;
+const ENEMY_COMBO_MAX = 3;
+// Gap between blows WITHIN a flurry -- short, so it reads as a combo.
+const ENEMY_COMBO_GAP = 6;
+// Pause after a whole flurry finishes, before they may start another.
+const ENEMY_ATTACK_COOLDOWN = 78;
 // An enemy's hurtbox as a fraction of its sprite width. Slightly narrower
 // than the art so a hit has to reach the body rather than clipping the
 // outermost pixel of a swinging limb or cape.
@@ -392,7 +401,10 @@ class Player {
       : amount;
     this.hp = clamp(this.hp - taken, 0, this.maxHp);
     this.hitStun = HIT_STUN_FRAMES;
-    this.invuln = 30;
+    // Short enough that an enemy flurry can actually land more than its
+    // first blow -- at 30 frames the invulnerability outlasted the gap
+    // between blows, so every second hit of a combo was swallowed.
+    this.invuln = PLAYER_INVULN_FRAMES;
     this.action = 'hurt';
 
     // Taking a hit DENIES the attack outright. It is not enough to switch
@@ -720,6 +732,9 @@ class Enemy {
     // contact frame has already dealt damage this swing.
     this.attackTimer = 0;
     this.attackLanded = false;
+    // Blows left in the current flurry, and the pause before the next one.
+    this.comboLeft = 0;
+    this.comboGap = 0;
     // Set once a blast has finished, so the level can drop the enemy.
     this.gone = false;
     // Rolled at the moment of death; the level spawns the pickup.
@@ -827,8 +842,17 @@ class Enemy {
         }
       }
       if (this.attackTimer <= 0) {
-        this.action = 'idle';
-        this.attackCooldown = ENEMY_ATTACK_COOLDOWN;
+        this.comboLeft--;
+        if (this.comboLeft > 0 && dist <= this.def.contactRange + 24) {
+          // Still swinging: brief gap, then the next blow of the flurry.
+          this.action = 'idle';
+          this.comboGap = ENEMY_COMBO_GAP;
+        } else {
+          // Flurry over (or the player got away) -- back off and reset.
+          this.action = 'idle';
+          this.comboLeft = 0;
+          this.attackCooldown = ENEMY_ATTACK_COOLDOWN;
+        }
       }
       this.tickAnimTimer();
       this.x = clamp(this.x, bounds.left, bounds.right);
@@ -837,6 +861,21 @@ class Enemy {
     }
 
     if (this.attackCooldown > 0) this.attackCooldown--;
+    if (this.comboGap > 0) {
+      this.comboGap--;
+      // Mid-flurry: hold position and throw the next blow the moment the
+      // gap elapses, so the burst stays tight.
+      if (this.comboGap === 0 && this.comboLeft > 0
+          && dist <= this.def.contactRange + 24) {
+        this.action = 'attack';
+        this.attackTimer = ENEMY_ATTACK_FRAMES;
+        this.attackLanded = false;
+      } else {
+        this.action = 'idle';
+      }
+      this.tickAnimTimer();
+      return;
+    }
 
     if (dist > this.def.contactRange) {
       const speed = this.def.speed;
@@ -850,6 +889,9 @@ class Enemy {
       this.action = 'attack';
       this.attackTimer = ENEMY_ATTACK_FRAMES;
       this.attackLanded = false;
+      // Commit to a flurry of a few blows rather than one jab.
+      this.comboLeft = ENEMY_COMBO_MIN
+        + Math.floor(Math.random() * (ENEMY_COMBO_MAX - ENEMY_COMBO_MIN + 1));
     } else {
       this.action = 'idle';
     }
@@ -1163,6 +1205,30 @@ function boxesOverlap(a, b) {
   return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 }
 
+// How much of the target an attack has to cover ACROSS to count as a hit.
+//
+// Bare overlap meant a single pixel of contact registered, so glancing past
+// someone landed the same blow as a square connection. This is measured
+// horizontally only: the question is whether the swing is lined up along
+// the target's width, not whether it happens to match their height. A
+// standing enemy is ~179px tall while a punch box is ~96px, so an area
+// test would fail on geometry alone however cleanly the blow connected.
+//
+// At or above the threshold the hit lands; just under it whiffs.
+const HIT_COVERAGE_REQUIRED = 0.5;
+
+// Horizontal overlap of two boxes, as a fraction of the narrower one.
+// Vertical overlap still has to exist -- you cannot hit someone you are not
+// level with -- but it is a yes/no gate rather than part of the score.
+function boxCoverage(a, b) {
+  const oy = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
+  if (oy <= 0) return 0;
+  const ox = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
+  if (ox <= 0) return 0;
+  const narrower = Math.min(a.w, b.w);
+  return narrower > 0 ? ox / narrower : 0;
+}
+
 // Resolves the player's active attack against a list of enemies, once per
 // swing: `attackHit` latches so a single punch can't tick damage on every
 // frame it overlaps. Returns the number of enemies struck.
@@ -1193,7 +1259,9 @@ function resolvePlayerAttacks(player, enemies) {
   let hits = 0;
   for (const enemy of enemies) {
     if (enemy.dead) continue;
-    if (!boxesOverlap(box, enemy.getHitbox())) continue;
+    // A glancing touch is not a hit: the swing has to cover enough of the
+    // target for the blow to read as landing on them.
+    if (boxCoverage(box, enemy.getHitbox()) < HIT_COVERAGE_REQUIRED) continue;
     enemy.takeDamage(box.damage, player.x);
     hits++;
   }
