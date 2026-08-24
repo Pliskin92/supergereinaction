@@ -5,4 +5,4 @@ node_modules
 web/assets/private
 
 # Per-frame PNG dumps (see .gitignore) are not needed in the image.
-frames/
+**/frames/
