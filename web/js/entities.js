@@ -96,7 +96,11 @@ const PLAYER_SLIDE_DURATION = 28;
 // transforms immediately: the sprite character swaps to the supergere
 // pack for FURY_ACTIVE_FRAMES, then reverts.
 const FURY_MAX = 100;
-const FURY_GAIN_PER_HIT = 1;
+// Meter gained per event, as a percentage of FURY_MAX. Landing or taking a
+// hit is worth the same; a landed heavy is worth slightly more, so the big
+// committed swing is also the fastest route to transforming.
+const FURY_GAIN_PER_HIT = 1.5;
+const FURY_GAIN_PER_HEAVY = 2;
 const FURY_ACTIVE_FRAMES = 20 * 60; // 20 seconds at 60fps
 // Transformed, every attack hits twice as hard. Applied centrally in
 // Player.attackBox so no individual move can miss out on it.
@@ -112,7 +116,10 @@ const PLAYER_HEAVY_DURATION = 30;
 // single 22 so two hits stay in the same weight class rather than
 // doubling the move's output outright.
 const PLAYER_HEAVY_HITS = 2;
-const PLAYER_HEAVY_DAMAGE = 14;
+// Per-attack damage. The punch combo is flat rather than escalating.
+const PLAYER_PUNCH_DAMAGE = 3;
+const PLAYER_KICK_DAMAGE = 6;
+const PLAYER_HEAVY_DAMAGE = 6;
 // Ticks between the two strikes, so they read as a swing and a follow
 // through rather than both landing on one frame.
 const PLAYER_HEAVY_HIT_GAP = 9;
@@ -315,7 +322,9 @@ class Player {
     this.animTimer = 0;
     this.prevAction = this.action;
     this.moveTimer = PLAYER_COMBO_WINDOW;
-    this.comboDamage = 8 + this.comboStep * 4;
+    // Flat across the combo: every punch is worth the same, so chaining is
+    // about pressure and animation flow rather than escalating damage.
+    this.comboDamage = PLAYER_PUNCH_DAMAGE;
     this.attackHit = false;
     this.attackHitCount = 0;
     this.lastHitTick = -999;
@@ -341,7 +350,8 @@ class Player {
   // Called for every hit this player lands or receives. Weight is
   // deliberately ignored — the meter counts hits, not damage — so a jab
   // and a heavy are worth the same 1%.
-  addFury() {
+  // gain defaults to an ordinary hit; a landed heavy passes its own rate.
+  addFury(gain = FURY_GAIN_PER_HIT) {
     // Characters without a transformation don't build a meter at all, so
     // no FURY HUD, no popup and no swap ever happens for them.
     if (!this.canFury()) return;
@@ -349,7 +359,7 @@ class Player {
     // toward the next one, otherwise a long transformation would refill
     // itself and chain indefinitely.
     if (this.furyActive) return;
-    this.fury = clamp(this.fury + FURY_GAIN_PER_HIT, 0, FURY_MAX);
+    this.fury = clamp(this.fury + gain, 0, FURY_MAX);
     if (this.fury >= FURY_MAX) this.startFury();
   }
 
@@ -564,7 +574,7 @@ class Player {
       return this.attackBox(132, 104, -120, 96, this.comboDamage);
     }
     if (this.action === 'slide' && this.moveTimer > 0) {
-      return this.attackBox(118, 96, -54, 54, 10);
+      return this.attackBox(118, 96, -54, 54, PLAYER_KICK_DAMAGE);
     }
     if (this.action === 'heavy' && this.moveTimer > 0) {
       // The heavy is a two-hit move: the swing connects, then follows
@@ -1271,7 +1281,9 @@ function resolvePlayerAttacks(player, enemies) {
     // Kept in sync so anything still reading the old boolean (and the
     // reset in startPunch/startKneeSlide/startHeavy) keeps working.
     player.attackHit = player.attackHitCount >= maxHits;
-    player.addFury();
+    player.addFury(
+      player.action === 'heavy' ? FURY_GAIN_PER_HEAVY : FURY_GAIN_PER_HIT,
+    );
   }
   return hits;
 }

@@ -23,7 +23,9 @@
   WASD/Arrows walk · <strong>Shift</strong> run · Space jump ·
   J punch · K roll · L heavy · <strong>ESC</strong> back
 </p>
-<canvas id="levelCanvas" width="960" height="336"></canvas>
+<!-- Height matches lv1-background.png's aspect at 960 wide, so the strip
+     draws at 1:1 rather than being scaled down. -->
+<canvas id="levelCanvas" width="960" height="387"></canvas>
 
 <script src="js/i18n.js"></script>
 <script src="js/sprites.js"></script>

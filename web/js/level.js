@@ -44,12 +44,15 @@ const ENEMY_ACTIVATE_RANGE = 520;
 // The street strip. Repeated LEVEL_LOOPS times to make the world.
 const LEVEL_BACKGROUND = 'assets/release/backgrounds/lv1/lv1-background.png';
 
-// Where the pavement sits inside the background art, as fractions of the
-// image height (see stages.js for the same convention). Measured off
-// lv1-background.png (1855x336): the kerb edge is at y=238 and the front
-// of the pavement at y=300, past which is the grey basement wall.
-const LEVEL_WALK_TOP = 0.708;
-const LEVEL_WALK_BOTTOM = 0.893;
+// The walkable band inside the background art, as fractions of the image
+// height (see stages.js for the same convention).
+//
+// Measured off lv1-background.png (1855x387): the open asphalt starts at
+// y=174 and the pavement runs to its front lip at y=351. Both are stood on
+// -- the art gives a deep road above the kerb, and confining the fight to
+// the 68px pavement strip alone would waste it.
+const LEVEL_WALK_TOP = 0.450;
+const LEVEL_WALK_BOTTOM = 0.907;
 // Keep actors clear of both edges of that band, as the arena stages do.
 const LEVEL_EDGE_MARGIN = 0.18;
 
