@@ -75,7 +75,8 @@ window.addEventListener('keydown', (e) => {
     if (e.key === 'k' || e.key === 'K') Input.pressed.slide = true;
     if (e.key === 'l' || e.key === 'L') Input.pressed.heavy = true;
     if (e.key === ' ') Input.pressed.jump = true;
-    if (e.key === 'f' || e.key === 'F') player.startFury();
+    // No debug FURY key here: in the level the meter has to be earned by
+    // landing and taking hits. Forcing it is an arena-only convenience.
     // Root-relative: this page sets <base href="/">.
     if (e.key === 'Escape') window.location.href = '/index.html';
   }
