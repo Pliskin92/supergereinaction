@@ -131,6 +131,11 @@ const CAR_FX = {
 };
 const CAR_FX_COUNT = 21;
 
+// A killed enemy pops in a short blast and is gone. Kept brief -- this is
+// punctuation on a kill, not a set piece.
+const ENEMY_BLAST_FRAMES = 26;
+const ENEMY_BLAST_RINGS = 3;
+
 // How long one debris particle lives, in ticks, and how many are thrown per
 // hit. Kept short so the burst reads as an impact rather than litter.
 const CAR_FX_LIFE = 34;
@@ -146,6 +151,56 @@ const SACK_HIT_PADDING = 18;
 // stand-in any more: assets are awaited before the game loop starts, so
 // a missing frame means the art failed to load rather than being still
 // in flight, and drawing an older placeholder only ever looked like a bug.
+
+// Expanding flash rings marking a defeated enemy. Purely cosmetic and
+// drawn with primitives, so it needs no sprite art of its own.
+function drawEnemyBlast(ctx, x, y, t) {
+  if (t >= 1) return;
+  ctx.save();
+  ctx.translate(x, y);
+
+  // Core first, so the rings expand OUT of it rather than being painted
+  // over by it. It also fades fast, which is what makes the pop read as a
+  // flash rather than a lingering blob.
+  const core = clamp(1 - t * 3.2, 0, 1);
+  if (core > 0) {
+    ctx.globalAlpha = core * 0.9;
+    ctx.fillStyle = '#fffbe8';
+    ctx.beginPath();
+    ctx.arc(0, 0, 4 + core * 14, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Rings start at staggered times so the burst reads as a pop rather than
+  // a single expanding circle.
+  for (let i = 0; i < ENEMY_BLAST_RINGS; i++) {
+    const rt = clamp((t - i * 0.14) / 0.72, 0, 1);
+    if (rt <= 0) continue;
+    const r = 10 + rt * (62 - i * 12);
+    ctx.globalAlpha = (1 - rt) * 0.95;
+    ctx.strokeStyle = i === 0 ? '#fff3c4' : (i === 1 ? '#ffd54d' : '#ff8a3d');
+    ctx.lineWidth = 6 - i * 1.5;
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  // A few sparks flung outward, so it is not purely concentric.
+  ctx.globalAlpha = clamp(1 - t * 1.3, 0, 1);
+  ctx.strokeStyle = '#ffd54d';
+  ctx.lineWidth = 3;
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2 + 0.4;
+    const r0 = 14 + t * 34;
+    const r1 = r0 + 14;
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(a) * r0, Math.sin(a) * r0 * 0.7);
+    ctx.lineTo(Math.cos(a) * r1, Math.sin(a) * r1 * 0.7);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
 
 // Generic humanoid draw used for player + family cast, parameterized by palette/pose.
 // pose: { walkPhase, action, facing, hitFlash }

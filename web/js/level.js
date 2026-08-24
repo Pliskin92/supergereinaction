@@ -173,11 +173,14 @@ function update() {
   // Only enemies near the player think or move. Distant ones stay put, so
   // a long street costs nothing and nobody sprints in from off-screen.
   for (const enemy of enemies) {
-    if (enemy.dead) continue;
-    if (Math.abs(enemy.x - player.x) > ENEMY_ACTIVATE_RANGE) continue;
+    // A dead enemy still ticks: its death blast has to play out and set
+    // `gone` before it can be dropped. Skipping it froze the burst forever.
+    if (!enemy.dead && Math.abs(enemy.x - player.x) > ENEMY_ACTIVATE_RANGE) continue;
     enemy.update(player, BOUNDS);
   }
   resolvePlayerAttacks(player, enemies);
+  // Drop enemies whose death blast has finished.
+  if (enemies.some((e) => e.gone)) enemies = enemies.filter((e) => !e.gone);
   updateCamera();
   furyPopup.update();
   clearPressed();
@@ -265,14 +268,6 @@ function loop() {
 }
 
 function levelSetUp() {
-  const select = document.getElementById('characterSelect');
-  if (select) {
-    player = new Player(120, BOUNDS.bottom, select.value);
-    select.addEventListener('change', () => {
-      player = new Player(player.x, BOUNDS.bottom, select.value);
-      select.blur();
-    });
-  }
   loadAssets();
   loadImage(LEVEL_BACKGROUND).then((img) => {
     if (!img) return;

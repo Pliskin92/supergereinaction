@@ -115,6 +115,22 @@ const PLAYER_HEAVY_DAMAGE = 14;
 // through rather than both landing on one frame.
 const PLAYER_HEAVY_HIT_GAP = 9;
 const HIT_STUN_FRAMES = 26;
+// A whole enemy walk clip, in ticks. The sheets are 25 frames, so this is
+// how long one full stride takes: low values read as a frantic shuffle.
+const ENEMY_WALK_CYCLE_FRAMES = 110;
+// How long an enemy's attack clip plays, and how far into it the blow
+// actually lands -- damage is dealt at the contact frame, not on the first
+// frame of the wind-up.
+const ENEMY_ATTACK_FRAMES = 30;
+const ENEMY_ATTACK_STRIKE_TICK = 14;
+// contactRange values are how close an enemy must be to swing. They were
+// authored when characters were ~60px tall; the sprites are now ~180px, so
+// a 14px range meant a minion had to stand almost inside the player before
+// it would ever attack -- it just walked into you forever.
+//
+// Pause between attacks once in range, so an enemy in your face does not
+// chain blows with no gap to punish.
+const ENEMY_ATTACK_COOLDOWN = 46;
 const GERE_WALK_CYCLE_FRAMES = 140;
 
 // jump_right's frames are uncropped 256x256 tiles with the character's
@@ -624,24 +640,34 @@ const EnemyTypes = {
     name: 'Bonus Car',
   },
   minion: {
-    hp: 25, speed: 0.7, damage: 6, contactRange: 14, color: { suit: '#38424f', accent: '#7d92a8', skin: Palette.skin, hair: '#333' },
+    // Minions pop and vanish when beaten rather than leaving a body on a
+    // street the player walks the length of.
+    blastOnDeath: true,
+    hp: 25, speed: 0.7, damage: 6, contactRange: 46, color: { suit: '#38424f', accent: '#7d92a8', skin: Palette.skin, hair: '#333' },
     scoreValue: 100,
     spriteCharacter: 'minion',
     // No sheet has an explicit hurt clip — hurt is conveyed purely via the
     // existing flashTimer brightness flash rather than a dedicated clip.
+    //
+    // cycleFrames is the whole 25-frame clip's duration in ticks. At 24 it
+    // played a full stride every 0.4s, which read as a frantic shuffle;
+    // ENEMY_WALK_CYCLE_FRAMES paces it to a believable walk (gere's own
+    // walk cycles over 140).
     spriteAnimMap: {
       idle: { key: 'idle_right', loop: false, holdFrames: 1 },
-      walk: { key: 'walk_right', loop: true, cycleFrames: 24 },
+      walk: { key: 'walk_right', loop: true, cycleFrames: ENEMY_WALK_CYCLE_FRAMES },
+      attack: { key: 'punch', loop: false, holdFrames: ENEMY_ATTACK_FRAMES },
       hurt: { key: 'idle_right', loop: false, holdFrames: 1 },
     },
   },
   boss1: {
-    hp: 250, speed: 0.55, damage: 16, contactRange: 20, color: { suit: '#0f5f2e', accent: '#ffffff', skin: Palette.skin, hair: '#1a1a1a' },
+    hp: 250, speed: 0.55, damage: 16, contactRange: 56, color: { suit: '#0f5f2e', accent: '#ffffff', skin: Palette.skin, hair: '#1a1a1a' },
     scoreValue: 2000, boss: true, name: 'The Hooded Villain',
     spriteCharacter: 'boss1',
     spriteAnimMap: {
       idle: { key: 'idle_right', loop: false, holdFrames: 1 },
-      walk: { key: 'walk_right', loop: true, cycleFrames: 24 },
+      walk: { key: 'walk_right', loop: true, cycleFrames: ENEMY_WALK_CYCLE_FRAMES },
+      attack: { key: 'punch', loop: false, holdFrames: ENEMY_ATTACK_FRAMES },
       hurt: { key: 'idle_right', loop: false, holdFrames: 1 },
       // 'ko' (this.dead) plays the fall/collapse clip once and holds the
       // last frame, matching how deathTimer already gates the KO duration.
@@ -663,7 +689,13 @@ class Enemy {
     this.action = 'idle';
     this.walkPhase = Math.random() * 10;
     this.hitStun = 0;
-    this.attackCooldown = 60 + Math.random() * 60;
+    this.attackCooldown = 30 + Math.random() * 40;
+    // Attack-clip playback: how long the swing has left, and whether its
+    // contact frame has already dealt damage this swing.
+    this.attackTimer = 0;
+    this.attackLanded = false;
+    // Set once a blast has finished, so the level can drop the enemy.
+    this.gone = false;
     this.dead = false;
     this.deathTimer = 0;
     this.flashTimer = 0;
@@ -714,6 +746,12 @@ class Enemy {
         this.revive();
         return;
       }
+      // Enemies that blast on death don't lie around: the burst plays out
+      // and they are gone. `gone` lets the caller drop them entirely.
+      if (this.def.blastOnDeath) {
+        if (this.deathTimer >= ENEMY_BLAST_FRAMES) this.gone = true;
+        return;
+      }
       if (this.action !== this.prevAction) {
         this.animTimer = 0;
         this.prevAction = this.action;
@@ -747,26 +785,59 @@ class Enemy {
     const dist = Math.hypot(dx, dy);
     this.facing = dx < 0 ? -1 : 1;
 
+    // Mid-attack: play the clip out, landing the blow at its contact frame
+    // rather than the instant the swing starts. The enemy holds position
+    // while swinging, so an attack is a commitment it can be punished for.
+    if (this.action === 'attack') {
+      this.attackTimer--;
+      if (!this.attackLanded && this.animTimer >= ENEMY_ATTACK_STRIKE_TICK) {
+        this.attackLanded = true;
+        // Only connects if the player is still in reach at contact -- so
+        // stepping out of a telegraphed swing avoids it.
+        if (dist <= this.def.contactRange + 10) {
+          player.takeDamage(this.def.damage, this.x);
+        }
+      }
+      if (this.attackTimer <= 0) {
+        this.action = 'idle';
+        this.attackCooldown = ENEMY_ATTACK_COOLDOWN;
+      }
+      this.tickAnimTimer();
+      this.x = clamp(this.x, bounds.left, bounds.right);
+      this.y = clamp(this.y, bounds.top, bounds.bottom);
+      return;
+    }
+
+    if (this.attackCooldown > 0) this.attackCooldown--;
+
     if (dist > this.def.contactRange) {
       const speed = this.def.speed;
       this.x += (dx / dist) * speed;
       this.y += (dy / dist) * speed;
       this.action = 'walk';
       this.walkPhase += 0.28;
+    } else if (this.attackCooldown <= 0 && this.hasAttackClip()) {
+      // In range and off cooldown: throw a punch straight away rather than
+      // standing there waiting out a timer.
+      this.action = 'attack';
+      this.attackTimer = ENEMY_ATTACK_FRAMES;
+      this.attackLanded = false;
     } else {
       this.action = 'idle';
-      this.attackCooldown--;
-      if (this.attackCooldown <= 0) {
-        this.attackCooldown = 70 + Math.random() * 50;
-        if (dist <= this.def.contactRange + 4) {
-          player.takeDamage(this.def.damage, this.x);
-        }
-      }
     }
 
     this.x = clamp(this.x, bounds.left, bounds.right);
     this.y = clamp(this.y, bounds.top, bounds.bottom);
     this.tickAnimTimer();
+  }
+
+  // Whether this enemy has an attack clip to play. One without simply
+  // never enters the attack state, rather than swinging invisibly.
+  hasAttackClip() {
+    const map = this.def.spriteAnimMap;
+    return !!(map && map.attack
+      && SpriteAnims[this.def.spriteCharacter]
+      && SpriteAnims[this.def.spriteCharacter][map.attack.key]);
   }
 
   tickAnimTimer() {
@@ -935,6 +1006,15 @@ class Enemy {
   }
 
   draw(ctx, cameraX = 0) {
+    // A blasting enemy is replaced by its burst for its whole death, so no
+    // body is drawn underneath it.
+    if (this.def.blastOnDeath && this.dead) {
+      drawEnemyBlast(
+        ctx, this.x - cameraX, this.y - 26,
+        this.deathTimer / ENEMY_BLAST_FRAMES,
+      );
+      return;
+    }
     // Death visuals (e.g. boss1's fall clip) hold for up to koAnim.holdFrames;
     // types without a 'ko' clip keep the previous fixed 60-frame window.
     const koAnim = this.def.spriteAnimMap && this.def.spriteAnimMap.ko;
