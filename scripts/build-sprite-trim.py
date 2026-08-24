@@ -1,6 +1,14 @@
 #!/usr/bin/env python3
 """Precompute per-frame trim data for every AutoSprite sheet.
 
+NOTE ON SOURCE ART: a hand-packed sheet that gets repacked into a uniform
+grid must be repacked to a NEW file -- keep the artist's original alongside
+it (conventionally `_source.png` in the pack folder, which this script
+ignores because it lives outside a clip directory). Overwriting the
+original in place destroys the only copy of any sprite the repack did not
+carry across, such as debris and impact FX.
+
+
 AutoSprite's atlas.json only records the uniform grid slicing (every frame
 is a 256x256 tile at a fixed x/y). It carries no trim box, no source size
 and no pivot, so the renderer has no way to know two things that differ
@@ -59,6 +67,10 @@ ALPHA_CUTOFF = 40
 # Clips whose pose is close enough to standing that their height is a fair
 # proxy for the character's true scale. Attack/knockdown/airborne clips
 # crouch, lunge or tuck, so their raw height says nothing about scale.
+# Matched case-insensitively: not every character's folders use the same
+# casing (supergere's are "Punch"/"Roll"/"Hurt" where gere's are lowercase),
+# and a casing mismatch here would silently misclassify a tucked clip as
+# upright and blow it up to standing height.
 UPRIGHT_CLIPS = ("idle_right", "walk_right", "victory", "wave", "hit_react")
 
 # Height only measures drawing scale for upright poses. These clips are
@@ -70,15 +82,28 @@ UPRIGHT_CLIPS = ("idle_right", "walk_right", "victory", "wave", "hit_react")
 POSE_SHORTENED_CLIPS = ("roll", "fall", "dash", "hurt", "ko")
 
 
-def frame_boxes(sheet_path, frame_size, cols, rows):
-    """Bounding box of the opaque pixels in every frame, in tile-local coords."""
+def is_upright(clip_name):
+    return clip_name.lower() in UPRIGHT_CLIPS
+
+
+def is_pose_shortened(clip_name):
+    return clip_name.lower() in POSE_SHORTENED_CLIPS
+
+
+def frame_boxes(sheet_path, frame_w, frame_h, cols, rows):
+    """Bounding box of the opaque pixels in every frame, in tile-local coords.
+
+    Tiles are not necessarily square: a sheet of side-on cars, for instance,
+    is far wider than it is tall, so width and height are tracked separately
+    rather than assuming one `frame_size` for both.
+    """
     img = Image.open(sheet_path).convert("RGBA")
     alpha = img.split()[3]
     boxes = {}
     for index in range(cols * rows):
         col, row = index % cols, index // cols
-        x0, y0 = col * frame_size, row * frame_size
-        tile = alpha.crop((x0, y0, x0 + frame_size, y0 + frame_size))
+        x0, y0 = col * frame_w, row * frame_h
+        tile = alpha.crop((x0, y0, x0 + frame_w, y0 + frame_h))
         # point() thresholds alpha so getbbox() ignores near-transparent
         # antialiasing fringes that would otherwise inflate every box.
         bbox = tile.point(lambda a: 255 if a > ALPHA_CUTOFF else 0).getbbox()
@@ -123,11 +148,21 @@ def main():
         for clip_name, clip_path in clip_dirs(char_dir):
             atlas = json.load(open(os.path.join(clip_path, "atlas.json")))
             meta = atlas["meta"]
-            frame_size = meta["frame_size"]["w"]
-            cols = meta["size"]["w"] // frame_size
-            rows = meta["size"]["h"] // frame_size
+            # Newer AutoSprite exports omit meta.frame_size and nest each
+            # frame under a "frame" key. Fall back to the first frame's own
+            # width, which is the tile size for these uniform-grid atlases.
+            if "frame_size" in meta:
+                frame_w = meta["frame_size"]["w"]
+                frame_h = meta["frame_size"].get("h", frame_w)
+            else:
+                first = atlas["frames"][sorted(atlas["frames"], key=int)[0]]
+                first = first.get("frame") or first
+                frame_w, frame_h = first["w"], first["h"]
+            cols = meta["size"]["w"] // frame_w
+            rows = meta["size"]["h"] // frame_h
             boxes = frame_boxes(
-                os.path.join(clip_path, "spritesheet.png"), frame_size, cols, rows
+                os.path.join(clip_path, "spritesheet.png"),
+                frame_w, frame_h, cols, rows,
             )
             if not boxes:
                 continue
@@ -143,11 +178,26 @@ def main():
         # The character's true scale comes from upright clips only; if a
         # character has none (every clip is an action), fall back to the
         # tallest clip so scaling is at least self-consistent.
-        upright = {n: c["height"] for n, c in clips.items() if n in UPRIGHT_CLIPS}
+        upright = {n: c["height"] for n, c in clips.items() if is_upright(n)}
         reference = (
             statistics.median(upright.values())
             if upright
             else max(c["height"] for c in clips.values())
+        )
+
+        # The character's standing baseline: where the feet rest when simply
+        # stood on the floor. Taken as the median over the upright clips'
+        # own lowest points, so one odd frame in one clip cannot shift it.
+        # This is what `lift` is measured against (see below), which keeps a
+        # grounded clip grounded even when its feet never quite reach that
+        # clip's own extreme.
+        upright_grounds = [
+            max(by1 for (_, _, _, by1) in clips[n]["boxes"].values())
+            for n in clips
+            if is_upright(n)
+        ]
+        standing_baseline = (
+            int(statistics.median(upright_grounds)) if upright_grounds else None
         )
 
         print("=== %s (reference height %.1f) ===" % (char_name, reference))
@@ -169,7 +219,7 @@ def main():
                 print("     reference is unreliable; source art needs a consistent export")
         for clip_name in sorted(clips):
             clip = clips[clip_name]
-            if clip_name in POSE_SHORTENED_CLIPS:
+            if is_pose_shortened(clip_name):
                 scale = 1.0
                 note = "  (pose-shortened, not rescaled)"
             elif clip["height"]:
@@ -185,12 +235,27 @@ def main():
             if check_only:
                 continue
 
-            # The clip's ground line: the lowest the feet ever reach. Frames
-            # whose feet sit above it are genuinely airborne -- jump encodes
-            # ~72px of real vertical motion this way -- so `lift` records
-            # that gap and lets the renderer raise those frames off the
-            # ground instead of flattening every frame onto one line.
-            ground = max(by1 for (_, _, _, by1) in clip["boxes"].values())
+            # The clip's ground line, which `lift` is measured against.
+            #
+            # Using this clip's own lowest point (max by1) is wrong for any
+            # clip whose feet never return to the standing baseline: one
+            # outlier frame -- a lunge, a low cape sweep -- then defines the
+            # floor and every *other* frame is reported as airborne. gere's
+            # attack_right is exactly this case: its frames sit at ~213, the
+            # same as idle, but a single frame reaching 236 gave the whole
+            # clip a ~23px phantom lift, so the character visibly floated
+            # up and down while attacking.
+            #
+            # The character's standing baseline (median over the upright
+            # clips) is the stable reference instead. A clip is only treated
+            # as leaving the ground when its feet rise above THAT, which is
+            # what genuine airborne motion looks like -- jump still encodes
+            # its real ~72px rise. Clips that dip below the standing line
+            # (crouches, slides) clamp to zero rather than reporting a
+            # negative lift.
+            ground = standing_baseline if standing_baseline is not None else max(
+                by1 for (_, _, _, by1) in clip["boxes"].values()
+            )
 
             frames = {}
             for index, (bx0, by0, bx1, by1) in sorted(clip["boxes"].items()):
@@ -200,7 +265,7 @@ def main():
                     "w": bx1 - bx0,
                     "h": by1 - by0,
                     "baseline": by1,
-                    "lift": ground - by1,
+                    "lift": max(0, ground - by1),
                 }
             payload = {
                 "reference_height": round(reference, 2),

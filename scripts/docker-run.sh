@@ -8,6 +8,14 @@ PORT="${PORT:-80}"
 
 cd "$(dirname "$0")/.."
 
+# Sprite trim data is derived from the spritesheet pixels, and the Dockerfile
+# only copies web/ verbatim -- it does no sprite processing. So an edited
+# spritesheet ships with stale trim.json (wrong scale/baseline, meaning a
+# clip renders at the wrong size or with the character's feet off the floor)
+# unless this runs first. It is idempotent: a no-op when the art is unchanged.
+echo "Regenerating sprite trim data..."
+python3 scripts/build-sprite-trim.py
+
 echo "Building $IMAGE_NAME..."
 docker build -t "$IMAGE_NAME" .
 

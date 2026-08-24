@@ -2,3 +2,8 @@ node_modules/
 .lint-bundle/
 *.log
 .env
+
+# AutoSprite exports each clip's individual PNG frames alongside the packed
+# spritesheet. Only the spritesheet + atlas are used at runtime, so the
+# per-frame dumps are working files, not shipped assets.
+frames/

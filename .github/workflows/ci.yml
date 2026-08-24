@@ -58,6 +58,38 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  sprite-trim:
+    name: Sprite trim data is current
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Pillow
+        run: pip install pillow
+
+      # trim.json is committed, but it is derived from the spritesheet
+      # pixels and the Dockerfile copies web/ verbatim without regenerating
+      # it. An edited spritesheet committed without rerunning the script
+      # therefore ships stale trim data silently -- clips render at the
+      # wrong size or with feet off the floor. Regenerating here and
+      # diffing catches that: no diff means the commit is consistent.
+      - name: Regenerate sprite trim data
+        run: python3 scripts/build-sprite-trim.py
+
+      - name: Fail if trim data was out of date
+        run: |
+          if ! git diff --quiet -- '**/trim.json'; then
+            echo "::error::trim.json is stale. Run 'python3 scripts/build-sprite-trim.py' and commit the result."
+            git diff --stat -- '**/trim.json'
+            git diff -- '**/trim.json'
+            exit 1
+          fi
+          echo "Sprite trim data is up to date."
+
   docker-image-scan:
     name: Docker image vulnerability scan
     runs-on: ubuntu-latest

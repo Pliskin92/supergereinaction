@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>404 — Super Gere</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    height: 100%;
+    background-color: #0d0c1d;
+    background-image:
+      radial-gradient(circle at 15% 20%, rgba(255, 42, 133, 0.25) 0%, transparent 40%),
+      radial-gradient(circle at 85% 80%, rgba(0, 245, 212, 0.2) 0%, transparent 40%),
+      radial-gradient(circle at 50% 50%, rgba(123, 44, 191, 0.2) 0%, transparent 60%);
+    color: #fff;
+    font-family: 'Outfit', system-ui, -apple-system, sans-serif;
+  }
+
+  #wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    padding: 24px;
+    gap: 14px;
+    text-align: center;
+  }
+
+  .code {
+    font-size: clamp(4rem, 18vw, 9rem);
+    font-weight: 900;
+    line-height: 1;
+    background: linear-gradient(135deg, #fff 0%, #ffeb3b 50%, #ff2a85 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  }
+
+  h1 {
+    font-size: clamp(1.1rem, 3.5vw, 1.6rem);
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  p {
+    color: #b9b2d0;
+    max-width: 40ch;
+    line-height: 1.5;
+  }
+
+  a.back {
+    margin-top: 8px;
+    display: inline-block;
+    padding: 10px 22px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #ff2a85, #7b2cbf);
+    color: #fff;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    font-size: 0.8rem;
+    text-decoration: none;
+    box-shadow: 0 0 18px rgba(255, 42, 133, 0.4);
+  }
+
+  a.back:hover { filter: brightness(1.15); }
+</style>
+</head>
+<body>
+
+<div id="wrap">
+  <div class="code">404</div>
+  <h1>Livello non trovato</h1>
+  <p>La modalità storia non è ancora pronta. Torna al menu principale.</p>
+  <a class="back" href="/index.html">← Menu</a>
+</div>
+
+</body>
+</html>

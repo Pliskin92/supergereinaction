@@ -2,7 +2,7 @@
   "reference_height": 161.0,
   "clip_height": 175.5,
   "scale": 0.9174,
-  "ground": 211,
+  "ground": 208,
   "frames": {
     "0": {
       "x": 103,
@@ -42,7 +42,7 @@
       "w": 66,
       "h": 207,
       "baseline": 207,
-      "lift": 4
+      "lift": 1
     },
     "5": {
       "x": 85,
@@ -50,7 +50,7 @@
       "w": 67,
       "h": 207,
       "baseline": 207,
-      "lift": 4
+      "lift": 1
     },
     "6": {
       "x": 82,

@@ -14,6 +14,9 @@ module.exports = [
         Image: 'readonly',
         Promise: 'readonly',
         fetch: 'readonly',
+        localStorage: 'readonly',
+        Proxy: 'readonly',
+        JSON: 'readonly',
       },
     },
     rules: {

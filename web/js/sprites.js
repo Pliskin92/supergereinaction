@@ -11,13 +11,6 @@ const Palette = {
   outline: '#0a0a0a',
 };
 
-function withAlpha(hex, a) {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return `rgba(${r},${g},${b},${a})`;
-}
-
 // Draws a rounded rect helper
 function rr(ctx, x, y, w, h, r) {
   ctx.beginPath();
@@ -28,6 +21,131 @@ function rr(ctx, x, y, w, h, r) {
   ctx.arcTo(x, y, x + w, y, r);
   ctx.closePath();
 }
+
+// Gym punching bag, hung from the ceiling on a chain like a real one.
+// `sway` is a radian angle the bag hangs at, so a hit can set it swinging.
+//
+// Unlike characters (which are drawn feet-on-origin), the bag hangs: the
+// origin passed in is still its ground line, but the geometry is built
+// upward from there and the whole assembly pivots at the ceiling anchor,
+// so a hit swings the bag through an arc the way a suspended bag actually
+// moves. `ceilingY` is where the chain is bolted, in the same space as y.
+//
+// The shape is authored at a 64px base height, from the era when
+// characters were drawn small. AutoSprite characters now render at their
+// authored ~194px (see the trim data's reference_height), which left the
+// bag looking like a toy next to them. SACK_SCALE brings it up to match.
+const SACK_SCALE = 3.6;
+
+// How far the bag's bottom rests above the floor. A hanging bag clears the
+// ground; this keeps it at roughly hip height on a character.
+const SACK_GROUND_CLEARANCE = 26;
+
+// Length of the boxing-sack swing clip, in ticks. The art is 24 frames;
+// played one per tick the swing is over in under half a second, so it is
+// stretched to read as a real swing that damps out.
+const SACK_SWING_FRAMES = 48;
+
+// How much of the bag sprite's height is the bag itself rather than the
+// chain and ceiling bracket above it. Only that lower portion is a
+// hurtbox: punching the chain should not count as hitting the bag.
+const SACK_BAG_FRACTION = 0.72;
+
+// Colour of the cord run between the ceiling and the bag's own shackle.
+const SACK_CHAIN_COLOR = '#0a0a0a';
+
+// How far the hanging bag is raised off its ground anchor. The sprite is
+// drawn feet-down from this.y like any other actor, so lifting it here
+// shortens the drop without touching the stage's floor line.
+const SACK_HANG_LIFT = 20;
+
+// Draws the chain run between a ceiling anchor and the top of the bag
+// sprite. The bag art includes its own shackle and a short length of
+// chain, but not the full drop to the roof (the art can't know how high
+// the ceiling is), so this bridges the remaining gap and caps it with a
+// mount plate. Nothing is drawn when the sprite already reaches the
+// anchor.
+// Height of one chain link. Links are drawn end-to-end down the run, so
+// this is also the repeat distance of the pattern.
+const SACK_LINK_H = 9;
+
+function drawSackChain(ctx, x, topY, ceilingY) {
+  if (topY <= ceilingY) return;
+  ctx.save();
+
+  // Eye bolt: a plate bolted to the ceiling with a ring hanging off it,
+  // which is what the top link actually threads through.
+  ctx.fillStyle = '#2a2a32';
+  rr(ctx, x - 11, ceilingY, 22, 5, 2);
+  ctx.fill();
+  ctx.strokeStyle = SACK_CHAIN_COLOR;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(x, ceilingY + 8, 4, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // The chain proper: oval links, each rotated 90 degrees from the one
+  // above it, which is what makes a real chain read as a chain rather
+  // than a rope. Alternating links are drawn narrow to fake that
+  // edge-on foreshortening.
+  const top = ceilingY + 11;
+  const runH = topY - top;
+  const links = Math.max(1, Math.round(runH / SACK_LINK_H));
+  const linkH = runH / links;
+  for (let i = 0; i < links; i++) {
+    const cy = top + (i + 0.5) * linkH;
+    const edgeOn = i % 2 === 1;
+    const rx = edgeOn ? 1.6 : 3.6;
+    ctx.lineWidth = edgeOn ? 2.4 : 1.8;
+    ctx.beginPath();
+    ctx.ellipse(x, cy, rx, linkH * 0.62, 0, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+// The car's damage states, in sheet-frame order: pristine through to a
+// flattened wreck. Extracted from the SF2-style source sheet (kept beside
+// the pack as spritesheet_source.png), one tile per state.
+const CAR_FRAME_HEALTHY = 0;
+const CAR_FRAME_WRECK = 8;
+const CAR_FRAME_COUNT = 9;
+
+// Each state takes this much damage to move past, so the car's total HP is
+// simply this times the number of steps.
+const CAR_HP_PER_PIECE = 50;
+const CAR_DAMAGE_STEPS = CAR_FRAME_COUNT - 1;
+
+// The car is drawn side-on, so its zones run along its length. A hit picks
+// the zone it landed in, which is where the impact debris is thrown from.
+const CAR_ZONES = ['front', 'cabin', 'rear'];
+
+// Impact debris pulled from the source sheet's bottom bands, grouped by
+// what each sprite reads as. Indices are into the 'fx' clip.
+const CAR_FX = {
+  glass: [0, 1, 2, 3, 4, 5],
+  debris: [6, 7, 8, 9, 10, 11, 12],
+  chips: [13, 14, 15],
+  spark: [16, 17, 18, 19, 20],
+};
+const CAR_FX_COUNT = 21;
+
+// How long one debris particle lives, in ticks, and how many are thrown per
+// hit. Kept short so the burst reads as an impact rather than litter.
+const CAR_FX_LIFE = 34;
+const CAR_FX_PER_HIT = 7;
+const CAR_FX_GRAVITY = 0.42;
+
+// Extra slack added around the bag's hurtbox on every side. The bag is an
+// inert training target, so a forgiving box is the point: the player should
+// connect when they look like they should, not only on an exact overlap.
+const SACK_HIT_PADDING = 18;
+
+// The bag is drawn only from its sprite pack. There is no procedural
+// stand-in any more: assets are awaited before the game loop starts, so
+// a missing frame means the art failed to load rather than being still
+// in flight, and drawing an older placeholder only ever looked like a bug.
 
 // Generic humanoid draw used for player + family cast, parameterized by palette/pose.
 // pose: { walkPhase, action, facing, hitFlash }

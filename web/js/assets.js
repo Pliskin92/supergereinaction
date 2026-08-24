@@ -1,12 +1,6 @@
-// Loads real cropped artwork from the Super Gere texture pack (see textures.jpeg).
-// Falls back gracefully: game logic never blocks on load, sprites.js vector
-// drawing is used automatically for anything not yet loaded.
-
-// The portrait/face/background art these used to list has moved to
-// web/assets/private/ and isn't shipped. Nothing drew any of it — the
-// entries were loaded into Assets and then never read — so they are gone
-// rather than repointed; add entries back here when something needs them.
-const AssetPaths = {};
+// Loads the sprite-sheet animations. Nothing blocks on this: a clip that
+// hasn't loaded (or doesn't exist for a character) simply isn't in
+// SpriteAnims, and callers fall back to sprites.js vector drawing.
 
 // Multi-frame sprite-sheet animations, generated via AutoSprite (see
 // web/assets/release/<character>_sprites/<name>/{spritesheet.png,atlas.json}).
@@ -27,20 +21,65 @@ const CANONICAL_ACTIONS = [
 
 // giovanni's sprites have moved to web/assets/private/ and are no longer
 // shipped, so the character is not loaded here any more.
-const PlayableCharacters = ['gere', 'giox', 'minion', 'boss1', 'carla'];
+//
+// 'supergere' is not selectable: it's the FURY transformation skin that
+// Player swaps to at full meter (see PLAYER_FURY_CHARACTER), but it loads
+// through exactly the same path as any other character.
+const PlayableCharacters = ['gere', 'giox', 'minion', 'boss1', 'carla', 'supergere'];
+
+// Per-character folder-name overrides. The convention is that a clip's
+// folder is named for its canonical action, but supergere's pack was
+// exported with capitalised names ('Punch', not 'punch') and uses
+// 'Hit React' with a space. Rather than rename the shipped art, map the
+// exceptions here; anything absent falls through to the canonical name.
+//
+// supergere's pack has no 'heavy' or 'wave' clip. 'wave' is cosmetic and is
+// simply left absent (it 404s and hasAction() reports it unavailable, the
+// same as any other partial character). 'heavy' is a combat move the player
+// would otherwise *lose* on transforming, which would make FURY a downgrade
+// mid-fight, so it is pointed at the pack's dedicated 'attack_right' clip.
+// gere's pack was re-exported from the same tool as supergere's, so it now
+// uses byte-identical folder names -- capitalised clips, 'Hit React' with a
+// space, and 'attack_right' in place of 'heavy'. The two therefore share one
+// alias table rather than keeping a duplicate copy per character.
+const AUTOSPRITE_CAPITALISED_CLIPS = {
+  punch: 'Punch',
+  kick: 'Kick',
+  roll: 'Roll',
+  hurt: 'Hurt',
+  hit_react: 'Hit React',
+  fall: 'Fall',
+  victory: 'Victory',
+  dance: 'Dance',
+  heavy: 'attack_right',
+};
+
+const SPRITE_FOLDER_ALIASES = {
+  supergere: AUTOSPRITE_CAPITALISED_CLIPS,
+  gere: AUTOSPRITE_CAPITALISED_CLIPS,
+};
 
 const CharacterSpriteSheets = {};
 for (const character of PlayableCharacters) {
   const sheets = {};
+  const aliases = SPRITE_FOLDER_ALIASES[character] || {};
   for (const action of CANONICAL_ACTIONS) {
-    sheets[action] = `${character}_sprites/${action}`;
+    sheets[action] = `${character}_sprites/${aliases[action] || action}`;
   }
   CharacterSpriteSheets[character] = sheets;
 }
 
-const Assets = {};
+// Prop sprite packs. These are not characters: they have no canonical
+// action set, they're never selectable, and each declares only the clips it
+// actually has. Kept out of PlayableCharacters so the roster stays the list
+// of things you can play as, but they load through the same path and land
+// in the same SpriteAnims table.
+const PropSpriteSheets = {
+  boxingsack: { swing: 'boxingsack_sprites/swing' },
+  car: { damage: 'car_sprites/damage', fx: 'car_sprites/fx' },
+};
+
 const SpriteAnims = {}; // SpriteAnims[character][action] -> anim data
-let assetsLoaded = false;
 
 function loadImage(src) {
   return new Promise((resolve) => {
@@ -70,10 +109,21 @@ function loadSpriteSheet(character, action, dir) {
     if (!image || !atlas) return;
     const frameKeys = Object.keys(atlas.frames).sort((a, b) => Number(a) - Number(b));
     if (!SpriteAnims[character]) SpriteAnims[character] = {};
+    // AutoSprite emits two atlas shapes. The character packs use a flat
+    // frame ({x,y,w,h}) plus meta.frame_size/duration_s; newer exports use
+    // the TexturePacker-style nested {frame:{x,y,w,h}} and omit both meta
+    // fields. Normalise here so everything downstream sees one shape,
+    // rather than teaching every consumer about the difference.
+    const frames = frameKeys.map((k) => {
+      const f = atlas.frames[k];
+      return f.frame ? f.frame : f;
+    });
+    const frameSize = atlas.meta.frame_size
+      || (frames.length ? { w: frames[0].w, h: frames[0].h } : null);
     SpriteAnims[character][action] = {
       image,
-      frames: frameKeys.map((k) => atlas.frames[k]),
-      frameSize: atlas.meta.frame_size,
+      frames,
+      frameSize,
       durationS: atlas.meta.duration_s || 1,
       trim: trim || null,
     };
@@ -81,21 +131,14 @@ function loadSpriteSheet(character, action, dir) {
 }
 
 function loadAssets() {
-  const keys = Object.keys(AssetPaths);
-  const imagePromises = keys.map((key) =>
-    loadImage(AssetPaths[key]).then((img) => {
-      if (img) Assets[key] = img;
-    })
-  );
   const sheetPromises = [];
-  for (const [character, actions] of Object.entries(CharacterSpriteSheets)) {
+  const packs = { ...CharacterSpriteSheets, ...PropSpriteSheets };
+  for (const [character, actions] of Object.entries(packs)) {
     for (const [action, dir] of Object.entries(actions)) {
       sheetPromises.push(loadSpriteSheet(character, action, dir));
     }
   }
-  return Promise.all([...imagePromises, ...sheetPromises]).then(() => {
-    assetsLoaded = true;
-  });
+  return Promise.all(sheetPromises);
 }
 
 // Returns the frame closest to `t` (0..1 normalized progress through the
@@ -121,7 +164,11 @@ function loadAssets() {
 // to be fixed in the sprite sheets themselves, not compensated for here.
 function getSpriteFrame(character, action, t) {
   const anim = SpriteAnims[character] && SpriteAnims[character][action];
-  if (!anim || anim.frames.length === 0) return null;
+  // `frames` is guarded rather than assumed: a sheet whose atlas.json is
+  // malformed still lands in SpriteAnims, and hasAction() only checks that
+  // the entry exists — so a bad atlas would otherwise crash the draw loop
+  // every frame instead of falling back to procedural drawing.
+  if (!anim || !anim.frames || anim.frames.length === 0) return null;
   const idx = Math.min(anim.frames.length - 1, Math.floor(clamp(t, 0, 0.999) * anim.frames.length));
   const f = anim.frames[idx];
 
