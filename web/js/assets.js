@@ -57,6 +57,9 @@ const AUTOSPRITE_CAPITALISED_CLIPS = {
 const SPRITE_FOLDER_ALIASES = {
   supergere: AUTOSPRITE_CAPITALISED_CLIPS,
   gere: AUTOSPRITE_CAPITALISED_CLIPS,
+  // The minion's newer clips came from the same exporter, so its reaction
+  // and death folders are capitalised too; its older combat clips are not.
+  minion: { hurt: 'Hurt', hit_react: 'Hit React' },
 };
 
 const CharacterSpriteSheets = {};

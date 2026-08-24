@@ -153,6 +153,10 @@ const ENEMY_ATTACK_COOLDOWN = 78;
 // than the art so a hit has to reach the body rather than clipping the
 // outermost pixel of a swinging limb or cape.
 const ENEMY_HURTBOX_WIDTH = 0.62;
+// How long a minion's collapse plays before its blast clears it away. The
+// fall clip is 25 frames; this paces it so the body actually drops rather
+// than snapping to the ground.
+const MINION_DEATH_FRAMES = 42;
 const GERE_WALK_CYCLE_FRAMES = 140;
 
 // jump_right's frames are uncropped 256x256 tiles with the character's
@@ -701,11 +705,18 @@ const EnemyTypes = {
     // played a full stride every 0.4s, which read as a frantic shuffle;
     // ENEMY_WALK_CYCLE_FRAMES paces it to a believable walk (gere's own
     // walk cycles over 140).
+    // The pack now has real reaction and death clips, so hurt no longer
+    // has to borrow the idle pose and the death is an actual collapse
+    // rather than the sprite simply vanishing.
     spriteAnimMap: {
       idle: { key: 'idle_right', loop: false, holdFrames: 1 },
       walk: { key: 'walk_right', loop: true, cycleFrames: ENEMY_WALK_CYCLE_FRAMES },
       attack: { key: 'punch', loop: false, holdFrames: ENEMY_ATTACK_FRAMES },
-      hurt: { key: 'idle_right', loop: false, holdFrames: 1 },
+      // Keys are canonical action names (SpriteAnims is keyed by those, not
+      // by folder); SPRITE_FOLDER_ALIASES maps them to the capitalised
+      // folders on disk.
+      hurt: { key: 'hurt', loop: false, holdFrames: HIT_STUN_FRAMES },
+      ko: { key: 'fall', loop: false, holdFrames: MINION_DEATH_FRAMES },
     },
   },
   boss1: {
@@ -799,10 +810,14 @@ class Enemy {
         this.revive();
         return;
       }
-      // Enemies that blast on death don't lie around: the burst plays out
-      // and they are gone. `gone` lets the caller drop them entirely.
+      // Enemies that blast on death don't lie around: they collapse, then
+      // the burst plays out and they are gone. `gone` lets the caller drop
+      // them entirely.
       if (this.def.blastOnDeath) {
-        if (this.deathTimer >= ENEMY_BLAST_FRAMES) this.gone = true;
+        const fallFor = this.deathFallFrames();
+        if (this.deathTimer >= fallFor + ENEMY_BLAST_FRAMES) this.gone = true;
+        // The collapse animates like any other clip while it plays.
+        if (this.deathTimer <= fallFor) this.animTimer++;
         return;
       }
       if (this.action !== this.prevAction) {
@@ -909,6 +924,15 @@ class Enemy {
     this.x = clamp(this.x, bounds.left, bounds.right);
     this.y = clamp(this.y, bounds.top, bounds.bottom);
     this.tickAnimTimer();
+  }
+
+  // How long this enemy's collapse plays before the blast takes over. An
+  // enemy with no death clip skips straight to the burst.
+  deathFallFrames() {
+    const ko = this.def.spriteAnimMap && this.def.spriteAnimMap.ko;
+    if (!ko) return 0;
+    const loaded = SpriteAnims[this.def.spriteCharacter];
+    return loaded && loaded[ko.key] ? ko.holdFrames : 0;
   }
 
   // Whether this enemy has an attack clip to play. One without simply
@@ -1106,9 +1130,22 @@ class Enemy {
     // A blasting enemy is replaced by its burst for its whole death, so no
     // body is drawn underneath it.
     if (this.def.blastOnDeath && this.dead) {
+      const fallFor = this.deathFallFrames();
+      if (this.deathTimer <= fallFor) {
+        // Still collapsing: draw the death clip like any other frame.
+        const frame = this.getSpriteDraw();
+        if (frame) {
+          ctx.save();
+          ctx.translate(this.x - cameraX, this.y);
+          ctx.scale(this.facing, 1);
+          drawSpriteFrame(ctx, frame);
+          ctx.restore();
+        }
+        return;
+      }
       drawEnemyBlast(
         ctx, this.x - cameraX, this.y - 26,
-        this.deathTimer / ENEMY_BLAST_FRAMES,
+        (this.deathTimer - fallFor) / ENEMY_BLAST_FRAMES,
       );
       return;
     }
