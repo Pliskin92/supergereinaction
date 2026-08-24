@@ -47,11 +47,11 @@ const LEVEL_BACKGROUND = 'assets/release/backgrounds/lv1/lv1-background.png';
 // The walkable band inside the background art, as fractions of the image
 // height (see stages.js for the same convention).
 //
-// Measured off lv1-background.png (1855x387): the open asphalt starts at
-// y=174 and the pavement runs to its front lip at y=351. Both are stood on
-// -- the art gives a deep road above the kerb, and confining the fight to
-// the 68px pavement strip alone would waste it.
-const LEVEL_WALK_TOP = 0.450;
+// Measured off lv1-background.png (1855x387): the pavement runs from its
+// kerb edge at y=283 to the front lip at y=351, past which is the basement
+// wall. Only the pavement is walkable -- the road above the kerb is
+// backdrop, not playfield.
+const LEVEL_WALK_TOP = 0.731;
 const LEVEL_WALK_BOTTOM = 0.907;
 // Keep actors clear of both edges of that band, as the arena stages do.
 const LEVEL_EDGE_MARGIN = 0.18;
