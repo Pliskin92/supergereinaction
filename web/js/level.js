@@ -20,11 +20,14 @@ const H = canvas.height;
 // last copy is what ends the level once there is somewhere to go.
 const LEVEL_LOOPS = 4;
 
+// The street strip. Repeated LEVEL_LOOPS times to make the world.
+const LEVEL_BACKGROUND = 'assets/release/backgrounds/lv1/lv1-background.png';
+
 // Where the pavement sits inside the background art, as fractions of the
 // image height (see stages.js for the same convention). Measured off
-// Background.png: the kerb edge is at y=230 and the front of the pavement
-// at y=300, past which is the dark basement wall.
-const LEVEL_WALK_TOP = 0.685;
+// lv1-background.png (1855x336): the kerb edge is at y=238 and the front
+// of the pavement at y=300, past which is the grey basement wall.
+const LEVEL_WALK_TOP = 0.708;
 const LEVEL_WALK_BOTTOM = 0.893;
 // Keep actors clear of both edges of that band, as the arena stages do.
 const LEVEL_EDGE_MARGIN = 0.18;
@@ -173,7 +176,7 @@ function levelSetUp() {
     });
   }
   loadAssets();
-  loadImage('assets/release/backgrounds/lv1/Background.png').then((img) => {
+  loadImage(LEVEL_BACKGROUND).then((img) => {
     if (!img) return;
     background = img;
     layoutLevel(img);
