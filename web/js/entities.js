@@ -364,8 +364,26 @@ class Player {
     this.hitStun = HIT_STUN_FRAMES;
     this.invuln = 30;
     this.action = 'hurt';
-    // Getting hit cancels the swing, so a press buffered during it must not
-    // fire a punch out of the hurt animation.
+
+    // Taking a hit DENIES the attack outright. It is not enough to switch
+    // the sprite to 'hurt': the swing's own timer and its hit latch have to
+    // be torn down too, or an already-started attack keeps its hitbox live
+    // and still connects while the character is visibly reeling.
+    //
+    // Clearing moveTimer ends the move, animTimer restarts playback from
+    // frame 0 so the next attack begins from scratch rather than resuming
+    // mid-swing, and the combo is dropped so the interrupted chain does not
+    // continue from where it left off. This is the core exchange: get hit,
+    // lose your turn.
+    this.moveTimer = 0;
+    this.animTimer = 0;
+    this.comboStep = 0;
+    this.comboDamage = 0;
+    this.attackHit = false;
+    this.attackHitCount = 0;
+    this.lastHitTick = -999;
+    // A press buffered during the swing must not fire a punch out of the
+    // hurt animation either.
     this.punchBuffer = 0;
     this.vx = (this.x < fromX ? -1 : 1) * 1.5;
   }
@@ -606,7 +624,7 @@ const EnemyTypes = {
     name: 'Bonus Car',
   },
   minion: {
-    hp: 30, speed: 0.7, damage: 6, contactRange: 14, color: { suit: '#38424f', accent: '#7d92a8', skin: Palette.skin, hair: '#333' },
+    hp: 25, speed: 0.7, damage: 6, contactRange: 14, color: { suit: '#38424f', accent: '#7d92a8', skin: Palette.skin, hair: '#333' },
     scoreValue: 100,
     spriteCharacter: 'minion',
     // No sheet has an explicit hurt clip — hurt is conveyed purely via the
@@ -618,7 +636,7 @@ const EnemyTypes = {
     },
   },
   boss1: {
-    hp: 220, speed: 0.55, damage: 16, contactRange: 20, color: { suit: '#0f5f2e', accent: '#ffffff', skin: Palette.skin, hair: '#1a1a1a' },
+    hp: 250, speed: 0.55, damage: 16, contactRange: 20, color: { suit: '#0f5f2e', accent: '#ffffff', skin: Palette.skin, hair: '#1a1a1a' },
     scoreValue: 2000, boss: true, name: 'The Hooded Villain',
     spriteCharacter: 'boss1',
     spriteAnimMap: {
