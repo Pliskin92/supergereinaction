@@ -18,9 +18,10 @@ const MENU_ITEMS = ['newGame', 'arena', 'highscores', 'options'];
 // the nginx root. Kept as functions so the headless test harness can stub
 // them instead of needing a real `location`.
 //
-// The story mode has no level yet, so New Game lands on a 404 placeholder.
+// New Game starts the story mode at level 1 (web/level/), the scrolling
+// street. Arena is the free-play gym.
 const ARENA_URL = '/arena/index.html';
-const NEW_GAME_URL = '/game/index.html';
+const NEW_GAME_URL = '/level/index.html';
 
 function navigateToArena() {
   window.location.href = ARENA_URL;
