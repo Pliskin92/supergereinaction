@@ -101,6 +101,8 @@ const FURY_ACTIVE_FRAMES = 20 * 60; // 20 seconds at 60fps
 // Transformed, every attack hits three times as hard. Applied centrally in
 // Player.attackBox so no individual move can miss out on it.
 const FURY_DAMAGE_MULTIPLIER = 3;
+// Transformed, incoming damage is divided by this -- doubled defence.
+const FURY_DEFENCE_MULTIPLIER = 2;
 const PLAYER_FURY_CHARACTER = 'supergere';
 // Only this character transforms. Everyone else has no FURY mechanic.
 const FURY_CHARACTER = 'gere';
@@ -131,6 +133,10 @@ const ENEMY_ATTACK_STRIKE_TICK = 14;
 // Pause between attacks once in range, so an enemy in your face does not
 // chain blows with no gap to punish.
 const ENEMY_ATTACK_COOLDOWN = 46;
+// An enemy's hurtbox as a fraction of its sprite width. Slightly narrower
+// than the art so a hit has to reach the body rather than clipping the
+// outermost pixel of a swinging limb or cape.
+const ENEMY_HURTBOX_WIDTH = 0.62;
 const GERE_WALK_CYCLE_FRAMES = 140;
 
 // jump_right's frames are uncropped 256x256 tiles with the character's
@@ -356,6 +362,10 @@ class Player {
     this.furyActive = true;
     this.furyTimer = FURY_ACTIVE_FRAMES;
     this.fury = FURY_MAX;
+    // Transforming is a full reset: SuperGere arrives at full health, and
+    // takes half damage for the duration (see takeDamage). Together with
+    // the triple attack power this is what makes FURY worth building.
+    this.hp = this.maxHp;
     this.spriteCharacter = PLAYER_FURY_CHARACTER;
     // The new pack's clips are different lengths; restart playback so the
     // swap doesn't resume mid-clip at a frame the new sheet doesn't have.
@@ -376,7 +386,11 @@ class Player {
   takeDamage(amount, fromX) {
     if (this.invuln > 0) return;
     this.addFury();
-    this.hp = clamp(this.hp - amount, 0, this.maxHp);
+    // Doubled defence while transformed: incoming damage is halved.
+    const taken = this.furyActive
+      ? Math.max(1, Math.round(amount / FURY_DEFENCE_MULTIPLIER))
+      : amount;
+    this.hp = clamp(this.hp - taken, 0, this.maxHp);
     this.hitStun = HIT_STUN_FRAMES;
     this.invuln = 30;
     this.action = 'hurt';
@@ -524,18 +538,30 @@ class Player {
     return this.furyActive ? FURY_DAMAGE_MULTIPLIER : 1;
   }
 
+  // Attack reach and box size, in pixels, measured from the player's centre
+  // to the far edge of the swing.
+  //
+  // These were authored for ~60px characters. At ~180px they not only fell
+  // short, their near edge sat inside the player's own body -- so the box
+  // covered where he stands rather than the space in front of him, and an
+  // enemy at a natural fighting gap was missed entirely. Reach now extends
+  // past arm's length and each box is deep enough to cover the approach,
+  // so a swing connects with anyone standing in front of you.
   getAttackHitbox() {
     if (this.isPunching() && this.moveTimer > 0) {
-      return this.attackBox(32, 16, -20, 20, this.comboDamage);
+      return this.attackBox(132, 104, -120, 96, this.comboDamage);
     }
     if (this.action === 'slide' && this.moveTimer > 0) {
-      return this.attackBox(26, 20, -6, 12, 10);
+      return this.attackBox(118, 96, -54, 54, 10);
     }
     if (this.action === 'heavy' && this.moveTimer > 0) {
       // The heavy is a two-hit move: the swing connects, then follows
       // through for a second strike. `hits` lets resolvePlayerAttacks let
       // the latch open that many times (see PLAYER_HEAVY_HITS).
-      const box = this.attackBox(44, 24, -22, 26, PLAYER_HEAVY_DAMAGE);
+      // The heavy is a big committed swing: it reaches further and sweeps a
+      // wider arc than a jab, so it can catch someone who is not quite in
+      // your face.
+      const box = this.attackBox(168, 132, -130, 112, PLAYER_HEAVY_DAMAGE);
       box.hits = PLAYER_HEAVY_HITS;
       return box;
     }
@@ -696,6 +722,8 @@ class Enemy {
     this.attackLanded = false;
     // Set once a blast has finished, so the level can drop the enemy.
     this.gone = false;
+    // Rolled at the moment of death; the level spawns the pickup.
+    this.dropsPotion = false;
     this.dead = false;
     this.deathTimer = 0;
     this.flashTimer = 0;
@@ -918,6 +946,9 @@ class Enemy {
       this.dead = true;
       this.action = 'ko';
       this.deathTimer = 0;
+      // Roll for a drop once, here, rather than when the body is cleared:
+      // the result must not change if the death is re-evaluated.
+      this.dropsPotion = Math.random() < POTION_DROP_CHANCE;
     }
   }
 
@@ -1000,6 +1031,20 @@ class Enemy {
         y: bottom - bagH - SACK_HIT_PADDING,
         w: halfW * 2,
         h: bagH + SACK_HIT_PADDING * 2,
+      };
+    }
+    // Box the enemy's actual drawn sprite. The old fixed 16x30 box dated
+    // from when characters were ~60px tall: against a ~180px minion it
+    // covered the ankles alone, so punches and kicks passed straight
+    // through the body without registering.
+    const frame = this.getSpriteDraw();
+    if (frame) {
+      const w = frame.sw * ENEMY_HURTBOX_WIDTH;
+      return {
+        x: this.x - w / 2,
+        y: this.y - frame.sh,
+        w,
+        h: frame.sh,
       };
     }
     return { x: this.x - 8, y: this.y - 30, w: 16, h: 30 };
@@ -1161,6 +1206,37 @@ function resolvePlayerAttacks(player, enemies) {
     player.addFury();
   }
   return hits;
+}
+
+// A health pickup left behind by a defeated enemy. Walk over it to drink.
+class Potion {
+  constructor(x, y) {
+    this.x = x;
+    this.y = y;
+    this.phase = Math.random() * 6;
+    this.taken = false;
+  }
+
+  // Returns true on the frame it is collected, so the caller can react.
+  update(player) {
+    if (this.taken) return false;
+    this.phase += POTION_BOB_SPEED;
+    if (Math.hypot(player.x - this.x, player.y - this.y) > POTION_PICKUP_RANGE) {
+      return false;
+    }
+    // Only worth picking up if it would actually heal something.
+    if (player.hp >= player.maxHp) return false;
+    this.taken = true;
+    player.hp = clamp(
+      player.hp + player.maxHp * POTION_HEAL_FRACTION, 0, player.maxHp,
+    );
+    return true;
+  }
+
+  draw(ctx, cameraX = 0) {
+    if (this.taken) return;
+    drawPotion(ctx, this.x - cameraX, this.y, this.phase);
+  }
 }
 
 // Impact debris thrown off the car when it is struck. Purely cosmetic: it

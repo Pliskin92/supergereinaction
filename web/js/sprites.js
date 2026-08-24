@@ -131,6 +131,50 @@ const CAR_FX = {
 };
 const CAR_FX_COUNT = 21;
 
+// Health potions dropped by defeated enemies.
+const POTION_DROP_CHANCE = 0.10;   // 1 in 10 enemies leaves one
+const POTION_HEAL_FRACTION = 0.10; // restores this much of max health
+const POTION_PICKUP_RANGE = 46;
+const POTION_BOB_SPEED = 0.09;
+
+// Drawn procedurally: a small flask with a glow, so it reads as a pickup
+// against a busy street without needing art of its own.
+function drawPotion(ctx, x, y, phase) {
+  const bob = Math.sin(phase) * 4;
+  ctx.save();
+  ctx.translate(x, y + bob);
+
+  // glow
+  ctx.globalAlpha = 0.30 + Math.sin(phase * 1.6) * 0.10;
+  ctx.fillStyle = '#5ac85a';
+  ctx.beginPath();
+  ctx.arc(0, -10, 18, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+
+  // flask body
+  ctx.fillStyle = '#2f6b34';
+  rr(ctx, -8, -18, 16, 18, 5);
+  ctx.fill();
+  ctx.fillStyle = '#5ac85a';
+  rr(ctx, -6, -12, 12, 11, 4);
+  ctx.fill();
+  // neck + cork
+  ctx.fillStyle = '#2f6b34';
+  ctx.fillRect(-3, -24, 6, 7);
+  ctx.fillStyle = '#c9963f';
+  ctx.fillRect(-4, -27, 8, 4);
+  // highlight
+  ctx.fillStyle = 'rgba(255,255,255,0.55)';
+  ctx.fillRect(-4, -15, 2, 6);
+
+  ctx.strokeStyle = Palette.outline;
+  ctx.lineWidth = 1;
+  rr(ctx, -8, -18, 16, 18, 5);
+  ctx.stroke();
+  ctx.restore();
+}
+
 // A killed enemy pops in a short blast and is gone. Kept brief -- this is
 // punctuation on a kill, not a set piece.
 const ENEMY_BLAST_FRAMES = 26;

@@ -107,6 +107,7 @@ let bgTop = 0;
 let BOUNDS = { left: 24, right: W - 24, top: H * 0.6, bottom: H - 30 };
 let player = new Player(120, BOUNDS.bottom, 'gere');
 let enemies = [];
+let potions = [];
 const furyPopup = new FuryPopup();
 
 // Scales the strip to fill the canvas height, then works out the world's
@@ -136,6 +137,7 @@ function layoutLevel(img) {
 // simply idle until the player is close enough to matter.
 function spawnEnemies() {
   enemies = [];
+  potions = [];
   const lane = BOUNDS.bottom - BOUNDS.top;
   let n = 0;
   for (const wave of LEVEL_WAVES) {
@@ -179,8 +181,15 @@ function update() {
     enemy.update(player, BOUNDS);
   }
   resolvePlayerAttacks(player, enemies);
-  // Drop enemies whose death blast has finished.
-  if (enemies.some((e) => e.gone)) enemies = enemies.filter((e) => !e.gone);
+  // Retire finished enemies, leaving a potion behind where one was rolled.
+  if (enemies.some((e) => e.gone)) {
+    for (const e of enemies) {
+      if (e.gone && e.dropsPotion) potions.push(new Potion(e.x, e.y));
+    }
+    enemies = enemies.filter((e) => !e.gone);
+  }
+  for (const potion of potions) potion.update(player);
+  if (potions.some((p) => p.taken)) potions = potions.filter((p) => !p.taken);
   updateCamera();
   furyPopup.update();
   clearPressed();
@@ -254,6 +263,8 @@ function draw() {
     const sx = e.x - cameraX;
     return sx > -200 && sx < W + 200 && (!e.dead || e.deathTimer < 90);
   });
+  // Pickups draw under the cast so a character standing on one still reads.
+  for (const potion of potions) potion.draw(ctx, cameraX);
   const actors = [player, ...visible].sort((a, b) => a.y - b.y);
   for (const actor of actors) actor.draw(ctx, cameraX);
   ctx.restore();
