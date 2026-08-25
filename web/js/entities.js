@@ -96,11 +96,11 @@ const PLAYER_SLIDE_DURATION = 28;
 // transforms immediately: the sprite character swaps to the supergere
 // pack for FURY_ACTIVE_FRAMES, then reverts.
 const FURY_MAX = 100;
-// Meter gained per event, as a percentage of FURY_MAX. Landing or taking a
-// hit is worth the same; a landed heavy is worth slightly more, so the big
-// committed swing is also the fastest route to transforming.
-const FURY_GAIN_PER_HIT = 1.5;
-const FURY_GAIN_PER_HEAVY = 2;
+// Meter gained per event, as a percentage of FURY_MAX. Flat: every hit
+// landed or taken is worth the same, so the meter fills at a steady,
+// predictable pace rather than rewarding one move over another.
+const FURY_GAIN_PER_HIT = 1;
+const FURY_GAIN_PER_HEAVY = 1;
 const FURY_ACTIVE_FRAMES = 20 * 60; // 20 seconds at 60fps
 // Transformed, every attack hits twice as hard. Applied centrally in
 // Player.attackBox so no individual move can miss out on it.
@@ -131,7 +131,11 @@ const PLAYER_INVULN_FRAMES = 20;
 const PLAYER_LIVES = 5;
 // The death pause before the respawn teleport begins, and how long that
 // arrival takes.
-const PLAYER_DEATH_FRAMES = 46;
+// The collapse itself: Gere drops and stays down for a beat before the
+// comeback, so a lost life reads as being knocked out rather than blinking
+// out of existence.
+const PLAYER_FALL_FRAMES = 40;
+const PLAYER_DEATH_FRAMES = PLAYER_FALL_FRAMES + 46;
 // Coming back is a rescue, not a reset: SuperGere arrives already
 // transformed with a half-full meter, so the player is handed a fighting
 // chance rather than dropped back in at square one.
@@ -270,6 +274,9 @@ const PLAYER_ANIM_MAP = {
   slide: { key: 'roll', loop: false, holdFrames: PLAYER_SLIDE_DURATION },
   heavy: { key: 'heavy', loop: false, holdFrames: PLAYER_HEAVY_DURATION },
   hurt: { key: 'hurt', loop: false, holdFrames: HIT_STUN_FRAMES },
+  // Collapsing on a lost life: plays once and holds its last frame while
+  // the exhausted beat runs.
+  ko: { key: 'fall', loop: false, holdFrames: PLAYER_FALL_FRAMES },
 };
 
 class Player {
@@ -301,6 +308,9 @@ class Player {
     this.respawnTimer = 0;
     // Set once every life is spent; the level reads it to end the run.
     this.gameOver = false;
+    // One-frame edge the level turns into a popup: 'exhausted' as he goes
+    // down, 'comeback' as he returns, 'gameOver' on the last life.
+    this.deathEvent = null;
     this.attackHit = false; // whether current attack already landed
     // How many times the current swing has connected, and the animTimer
     // tick of the last one. A multi-hit box (the heavy) compares against
@@ -526,7 +536,8 @@ class Player {
     this.dead = true;
     this.deathTimer = PLAYER_DEATH_FRAMES;
     this.respawnTimer = 0;
-    this.action = 'hurt';
+    // Collapse, rather than freezing on the hurt pose.
+    this.action = 'ko';
     this.animTimer = 0;
     this.moveTimer = 0;
     this.vx = 0;
@@ -554,6 +565,9 @@ class Player {
     // startFury() refills to full and swaps the sprite; the meter is then
     // set back to half so the transformation is on a short clock.
     this.startFury();
+    // The comeback card is the announcement here -- suppress the routine
+    // transformation popup so it does not immediately overwrite it.
+    this.furyEvent = null;
     this.fury = FURY_MAX * RESPAWN_FURY_FRACTION;
     if (this.furyActive) {
       this.furyTimer = Math.round(FURY_ACTIVE_FRAMES * RESPAWN_FURY_FRACTION);
@@ -572,7 +586,18 @@ class Player {
       if (this.gameOver) return;
       if (this.deathTimer > 0) {
         this.deathTimer--;
-        if (this.deathTimer === 0) this.respawnTimer = TELEPORT_FRAMES;
+        // Advance the collapse; getSpriteDraw clamps past its last frame,
+        // so he stays down once it finishes.
+        this.animTimer++;
+        // Fire the events the level turns into popups: the exhausted call
+        // as he drops, then the comeback as he is about to return.
+        if (this.deathTimer === PLAYER_DEATH_FRAMES - 1) {
+          this.deathEvent = this.gameOver ? 'gameOver' : 'exhausted';
+        }
+        if (this.deathTimer === 0) {
+          this.respawnTimer = TELEPORT_FRAMES;
+          if (!this.gameOver) this.deathEvent = 'comeback';
+        }
         return;
       }
       if (this.respawnTimer > 0) {
@@ -751,7 +776,19 @@ class Player {
     // Dead: nothing is drawn during the pause, then the red teleport plays
     // with the sprite fading up inside it, mirroring how minions arrive.
     if (this.dead) {
-      if (this.gameOver || this.respawnTimer <= 0) return;
+      // Collapsing: draw the fall clip, then hold its last frame on the
+      // ground through the rest of the pause.
+      if (this.respawnTimer <= 0) {
+        const frame = this.getSpriteDraw();
+        if (frame) {
+          ctx.save();
+          ctx.translate(sx, this.y);
+          ctx.scale(this.facing, 1);
+          drawSpriteFrame(ctx, frame);
+          ctx.restore();
+        }
+        return;
+      }
       const frame = this.getSpriteDraw();
       const height = frame ? frame.sh : 170;
       const t = 1 - this.respawnTimer / TELEPORT_FRAMES;

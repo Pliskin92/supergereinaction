@@ -236,6 +236,10 @@ function update() {
   furyPopup.follow(player, strings());
   if (furyPopup.freezing) {
     furyPopup.update();
+    // The death sequence has to keep running through the freeze: it fires
+    // the popups the freeze is displaying, so stalling it would leave the
+    // "GERE'S BACK" card hanging with nothing behind it.
+    if (player.dead) player.update(Input, BOUNDS);
     clearPressed();
     return;
   }

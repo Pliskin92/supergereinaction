@@ -102,7 +102,20 @@ class FuryPopup {
   // Watches a player for transformation edges so callers only have to
   // forward the player once per frame.
   follow(player, strings) {
-    if (!player || !player.furyEvent) return;
+    if (!player) return;
+    // Death beats take precedence: going down and coming back are bigger
+    // moments than a transformation timing out.
+    if (player.deathEvent) {
+      if (player.deathEvent === 'exhausted') this.show(strings.exhausted, 'bad');
+      else if (player.deathEvent === 'comeback') this.show(strings.comeback, 'good');
+      else if (player.deathEvent === 'gameOver') this.show(strings.exhausted, 'bad');
+      player.deathEvent = null;
+      // Swallow any transformation edge fired on the same frame -- ending
+      // FURY is part of dying, not a separate announcement.
+      player.furyEvent = null;
+      return;
+    }
+    if (!player.furyEvent) return;
     if (player.furyEvent === 'start') this.show(strings.furyOn, 'good');
     else if (player.furyEvent === 'end') this.show(strings.furyOff, 'bad');
     player.furyEvent = null;
