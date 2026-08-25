@@ -299,7 +299,9 @@ function drawHud() {
   ctx.fillText(t('level1Title'), 12, 12);
 
   // Lives, as hearts beside the health bar.
-  for (let i = 0; i < PLAYER_LIVES; i++) {
+  // One pip per life the run started with, so the count reads against the
+  // chosen difficulty rather than a fixed five.
+  for (let i = 0; i < player.maxLives; i++) {
     drawHeart(ctx, 18 + i * 15, 22, 12, i < player.lives);
   }
 

@@ -269,7 +269,11 @@ class Player {
     this.invuln = 0;
     // Lives left, and the death/respawn sequence. deathTimer counts the
     // pause; respawnTimer counts the teleport arrival.
-    this.lives = PLAYER_LIVES;
+    // Lives come from the chosen difficulty; PLAYER_LIVES is the fallback
+    // for pages that have no settings loaded (the arena, say).
+    this.lives = typeof difficultyLives === 'function'
+      ? difficultyLives() : PLAYER_LIVES;
+    this.maxLives = this.lives;
     this.dead = false;
     this.deathTimer = 0;
     this.respawnTimer = 0;

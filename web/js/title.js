@@ -12,6 +12,8 @@ const TitleScreen = {
 };
 
 const MENU_ITEMS = ['newGame', 'arena', 'highscores', 'options'];
+// Rows on the Options screen, in display order.
+const OPTION_ROWS = ['language', 'difficulty'];
 
 // Both entries that start play are separate pages, served from the same
 // root as this one — see the Dockerfile, which copies web/ wholesale into
@@ -36,6 +38,7 @@ class TitleMenu {
     this.W = W;
     this.H = H;
     this.screen = TitleScreen.MENU;
+    this.optionIndex = 0;
     this.index = 0;
     this.tick = 0;
   }
@@ -54,11 +57,17 @@ class TitleMenu {
     }
 
     if (this.screen === TitleScreen.OPTIONS) {
-      const langs = Object.keys(Languages);
-      if (key === 'ArrowLeft' || key === 'ArrowRight') {
+      // Up/down picks a row, left/right changes it.
+      if (key === 'ArrowUp' || key === 'ArrowDown') {
+        const dir = key === 'ArrowUp' ? -1 : 1;
+        this.optionIndex = (this.optionIndex + dir + OPTION_ROWS.length) % OPTION_ROWS.length;
+      } else if (key === 'ArrowLeft' || key === 'ArrowRight') {
         const dir = key === 'ArrowLeft' ? -1 : 1;
-        const at = langs.indexOf(Settings.lang);
-        Settings.lang = langs[(at + dir + langs.length) % langs.length];
+        const row = OPTION_ROWS[this.optionIndex];
+        const keys = Object.keys(row === 'language' ? Languages : Difficulties);
+        const field = row === 'language' ? 'lang' : 'difficulty';
+        const at = keys.indexOf(Settings[field]);
+        Settings[field] = keys[(at + dir + keys.length) % keys.length];
         saveSettings(Settings);
       } else if (key === 'Enter' || key === 'Escape') {
         this.screen = TitleScreen.MENU;
@@ -201,8 +210,19 @@ class TitleMenu {
     ctx.fillText(t('options'), W / 2, H * 0.48);
 
     ctx.font = '10px monospace';
-    ctx.fillStyle = '#cfc9e0';
-    ctx.fillText(`${t('language')}:  ◀  ${Languages[Settings.lang]}  ▶`, W / 2, H * 0.60);
+    const rows = [
+      [t('language'), Languages[Settings.lang]],
+      [t('difficulty'), `${Difficulties[Settings.difficulty].label} (${difficultyLives()}\u2665)`],
+    ];
+    rows.forEach(([label, value], i) => {
+      const selected = i === this.optionIndex;
+      ctx.fillStyle = selected ? '#ffd54d' : '#cfc9e0';
+      const arrows = selected ? ['\u25C0', '\u25B6'] : [' ', ' '];
+      ctx.fillText(
+        `${label}:  ${arrows[0]}  ${value}  ${arrows[1]}`,
+        W / 2, H * (0.58 + i * 0.09),
+      );
+    });
 
     ctx.font = '8px monospace';
     ctx.fillStyle = 'rgba(255,255,255,0.55)';

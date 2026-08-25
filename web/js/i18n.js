@@ -23,6 +23,7 @@ const Strings = {
     // Kept in English in both languages: they are the cartoon title cards.
     level1Title: 'LIVELLO 1 — LA STRADA',
     loading: 'CARICAMENTO...',
+    difficulty: 'DIFFICULTY',
     gameOver: 'GAME OVER',
     gameOverHint: 'INVIO PER RICOMINCIARE',
     furyOn: 'SUPER GERE TRANSFORMATION!!',
@@ -43,6 +44,7 @@ const Strings = {
     fury: 'FURIA',
     level1Title: 'LIVELLO 1 — LA STRADA',
     loading: 'CARICAMENTO...',
+    difficulty: 'DIFFICOLTA',
     gameOver: 'GAME OVER',
     gameOverHint: 'INVIO PER RICOMINCIARE',
     furyOn: 'SUPER GERE TRANSFORMATION!!',
@@ -53,6 +55,24 @@ const Strings = {
   },
 };
 
+// Difficulty is purely how many lives a run starts with. Stored in
+// Settings so the title screen and the level agree without either having
+// to know about the other.
+const Difficulties = {
+  easy: { label: 'EASY', lives: 10 },
+  medium: { label: 'MEDIUM', lives: 5 },
+  hard: { label: 'HARD', lives: 2 },
+  hell: { label: 'HELL', lives: 1 },
+};
+const DEFAULT_DIFFICULTY = 'medium';
+
+// Lives for the chosen difficulty, falling back to the default if the
+// stored value is missing or no longer a known setting.
+function difficultyLives() {
+  const d = Difficulties[Settings.difficulty] || Difficulties[DEFAULT_DIFFICULTY];
+  return d.lives;
+}
+
 const SETTINGS_KEY = 'supergere.settings';
 
 function loadSettings() {
@@ -60,9 +80,14 @@ function loadSettings() {
   // null, so this has to be guarded, not just null-checked.
   try {
     const raw = localStorage.getItem(SETTINGS_KEY);
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const stored = JSON.parse(raw);
+      // Settings saved before difficulty existed have no such key.
+      if (!stored.difficulty) stored.difficulty = DEFAULT_DIFFICULTY;
+      return stored;
+    }
   } catch (e) { /* no stored settings available */ }
-  return { lang: 'it' };
+  return { lang: 'it', difficulty: DEFAULT_DIFFICULTY };
 }
 
 function saveSettings(settings) {
