@@ -166,12 +166,23 @@ const ENEMY_ATTACK_COOLDOWN = 78;
 // than the art so a hit has to reach the body rather than clipping the
 // outermost pixel of a swinging limb or cape.
 const ENEMY_HURTBOX_WIDTH = 0.62;
-// An enemy commits to a swing from this far out -- comparable to the reach
-// of the player's own attacks, so they start swinging as you close rather
-// than waiting until they are touching you. Whether the blow LANDS is a
-// separate question, decided at its contact frame: committing early means
-// they can whiff, which is what gives you something to step around.
-const ENEMY_ATTACK_COMMIT_RANGE = 150;
+// An enemy commits to a swing only when the blow stands a real chance of
+// landing: within its own strike reach plus a small lead for the ground it
+// closes during the wind-up.
+//
+// This used to be 150px against a 112px reach, so every swing thrown on
+// approach was already 38px short before it started -- they flailed at the
+// air the whole way in and only ever connected when the player walked into
+// them. Committing inside their reach means a swing is a real threat.
+const ENEMY_ATTACK_COMMIT_RANGE = 118;
+
+// Before swinging, an enemy squares up for a moment. This is what turns a
+// contact into a telegraphed attack: you get a beat to see it coming and
+// step out, rather than being hit the instant they arrive.
+const ENEMY_WINDUP_FRAMES = 14;
+// Enemies do not all lunge at once -- each holds off for a random slice of
+// this, so a group arrives as a loose crowd rather than a firing squad.
+const ENEMY_APPROACH_HESITATION = 40;
 
 // How far a swing actually reaches at its contact frame.
 //
@@ -889,6 +900,11 @@ class Enemy {
     // Blows left in the current flurry, and the pause before the next one.
     this.comboLeft = 0;
     this.comboGap = 0;
+    // Counts down while squaring up before a swing.
+    this.windup = 0;
+    // A per-enemy pause before committing, so a group does not all lunge on
+    // the same frame.
+    this.hesitation = Math.random() * ENEMY_APPROACH_HESITATION;
     // True while swinging a roll-punish: a longer, further-reaching move
     // thrown in answer to the player rolling.
     this.punishing = false;
@@ -1035,6 +1051,7 @@ class Enemy {
           this.action = 'idle';
           this.comboLeft = 0;
           this.attackCooldown = ENEMY_ATTACK_COOLDOWN;
+          this.hesitation = Math.random() * ENEMY_APPROACH_HESITATION;
         }
       }
       this.tickAnimTimer();
@@ -1044,6 +1061,26 @@ class Enemy {
     }
 
     if (this.attackCooldown > 0) this.attackCooldown--;
+
+    // Squaring up: hold still, then swing. Broken off if the player leaves
+    // the range the enemy committed to, so backing away beats the read.
+    if (this.windup > 0) {
+      this.windup--;
+      this.action = 'idle';
+      if (dist > ENEMY_ATTACK_COMMIT_RANGE + 40) {
+        this.windup = 0;
+      } else if (this.windup === 0) {
+        this.action = 'attack';
+        this.attackTimer = ENEMY_ATTACK_FRAMES;
+        this.attackLanded = false;
+        this.comboLeft = ENEMY_COMBO_MIN
+          + Math.floor(Math.random() * (ENEMY_COMBO_MAX - ENEMY_COMBO_MIN + 1));
+      }
+      this.tickAnimTimer();
+      this.x = clamp(this.x, bounds.left, bounds.right);
+      this.y = clamp(this.y, bounds.top, bounds.bottom);
+      return;
+    }
 
     // Read the roll. The moment the player commits to one, an enemy in
     // range may answer with a longer swing that covers the ground the roll
@@ -1083,21 +1120,21 @@ class Enemy {
       return;
     }
 
+    if (this.hesitation > 0) this.hesitation--;
+
     if (dist > ENEMY_ATTACK_COMMIT_RANGE) {
       const speed = this.def.speed;
       this.x += (dx / dist) * speed;
       this.y += (dy / dist) * speed;
       this.action = 'walk';
       this.walkPhase += 0.28;
-    } else if (this.attackCooldown <= 0 && this.hasAttackClip()) {
-      // In range and off cooldown: throw a punch straight away rather than
-      // standing there waiting out a timer.
-      this.action = 'attack';
-      this.attackTimer = ENEMY_ATTACK_FRAMES;
-      this.attackLanded = false;
-      // Commit to a flurry of a few blows rather than one jab.
-      this.comboLeft = ENEMY_COMBO_MIN
-        + Math.floor(Math.random() * (ENEMY_COMBO_MAX - ENEMY_COMBO_MIN + 1));
+    } else if (this.attackCooldown <= 0 && this.hasAttackClip()
+        && this.hesitation <= 0) {
+      // In range: square up first. The swing starts when the wind-up
+      // elapses, which is what makes the attack readable rather than
+      // landing the instant they arrive.
+      this.windup = ENEMY_WINDUP_FRAMES;
+      this.action = 'idle';
     } else if (dist > this.def.contactRange) {
       // In swinging range but on cooldown: keep closing, so they press you
       // instead of hovering at the edge of their reach.
