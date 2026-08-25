@@ -27,19 +27,36 @@ const LEVEL_LOOPS = 12;
 // encounters with breathing room between them, not one enemy every few
 // seconds. Each entry is a fraction along the world and how many stand
 // there; they are spread over a short span so a group arrives together.
-const LEVEL_WAVES = [
-  { at: 0.045, count: 2 }, { at: 0.10, count: 3 }, { at: 0.16, count: 2 },
-  { at: 0.22, count: 3 }, { at: 0.28, count: 3 }, { at: 0.34, count: 4 },
-  { at: 0.40, count: 3 }, { at: 0.46, count: 4 }, { at: 0.52, count: 3 },
-  { at: 0.58, count: 4 }, { at: 0.64, count: 4 }, { at: 0.70, count: 3 },
-  { at: 0.76, count: 4 }, { at: 0.82, count: 5 }, { at: 0.88, count: 4 },
-];
-const LEVEL_WAVE_SPREAD = 220;   // px a group is scattered across
+// Minions arrive in locked encounters rather than trickling in: walk far
+// enough and a group teleports in ON SCREEN, the street locks, and the lock
+// only lifts once every one of them is down. That is the beat-em-up shape
+// -- fight a room, move on -- instead of a running battle you can outrun.
+const LEVEL_MINION_TOTAL = 72;
+// How many arrive together in one encounter.
+const LEVEL_ENCOUNTER_SIZE = 5;
+// Encounters are triggered at these fractions along the world. There are
+// enough of them to place the whole roster before the boss.
+const LEVEL_ENCOUNTER_COUNT = Math.ceil(LEVEL_MINION_TOTAL / LEVEL_ENCOUNTER_SIZE);
+const LEVEL_ENCOUNTER_FROM = 0.05;
+const LEVEL_ENCOUNTER_TO = 0.90;
+// Where in the visible screen they may appear, as fractions of its width.
+// Kept inside the edges so nobody materialises half off-screen, and clear
+// of the very centre so they do not land on top of the player.
+const LEVEL_SPAWN_SCREEN_MIN = 0.10;
+const LEVEL_SPAWN_SCREEN_MAX = 0.90;
+const LEVEL_SPAWN_CLEAR_OF_PLAYER = 110;
+// The lock holds the player this far back from the right edge of the
+// locked zone, so the barrier is felt rather than invisible.
+const LEVEL_LOCK_MARGIN = 40;
+
 const LEVEL_BOSS_AT = 0.95;
 
-// A minion only wakes when the player gets near, so the whole street is not
-// charging at once from the moment the level loads.
-const ENEMY_ACTIVATE_RANGE = 520;
+// A minion only thinks within this range of the player, so distant ones
+// cost nothing. It has to comfortably exceed the spawn distance -- minions
+// arrive just off either screen edge, which is already ~480px away from a
+// centred player -- or a freshly teleported one would stand frozen where
+// it landed instead of walking in.
+const ENEMY_ACTIVATE_RANGE = 900;
 
 // The street strip. Repeated LEVEL_LOOPS times to make the world.
 const LEVEL_BACKGROUND = 'assets/release/backgrounds/lv1/lv1-background.png';
@@ -112,6 +129,11 @@ let BOUNDS = { left: 24, right: W - 24, top: H * 0.6, bottom: H - 30 };
 let player = new Player(120, BOUNDS.bottom, 'gere');
 let enemies = [];
 let potions = [];
+let minionsSpawned = 0;
+let encountersDone = 0;
+// Right-hand wall while an encounter is being fought; 0 when the street is
+// open. The player cannot walk past it until the group is cleared.
+let lockUntilX = 0;
 const furyPopup = new FuryPopup();
 
 // Scales the strip to fill the canvas height, then works out the world's
@@ -137,25 +159,61 @@ function layoutLevel(img) {
   spawnEnemies();
 }
 
-// Lays the cast out along the world. Enemies are placed once, at load, and
-// simply idle until the player is close enough to matter.
+// Places only the boss. Minions arrive in encounters as the level is
+// walked; see triggerEncounter().
 function spawnEnemies() {
   enemies = [];
   potions = [];
+  minionsSpawned = 0;
+  encountersDone = 0;
+  lockUntilX = 0;
   const lane = BOUNDS.bottom - BOUNDS.top;
-  let n = 0;
-  for (const wave of LEVEL_WAVES) {
-    const baseX = worldWidth * wave.at;
-    for (let i = 0; i < wave.count; i++) {
-      // Scatter each group along the street and across the lane's depth so
-      // they arrive as a loose crowd rather than a single file.
-      const x = baseX + (i - (wave.count - 1) / 2) * (LEVEL_WAVE_SPREAD / wave.count);
-      const depth = BOUNDS.top + lane * (0.18 + ((n + i) % 4) * 0.22);
-      enemies.push(new Enemy('minion', x, depth));
-    }
-    n += wave.count;
-  }
   enemies.push(new Enemy('boss1', worldWidth * LEVEL_BOSS_AT, BOUNDS.top + lane * 0.5));
+}
+
+// World x at which the next encounter fires.
+function nextEncounterX() {
+  if (encountersDone >= LEVEL_ENCOUNTER_COUNT) return Infinity;
+  const span = LEVEL_ENCOUNTER_TO - LEVEL_ENCOUNTER_FROM;
+  const step = span / LEVEL_ENCOUNTER_COUNT;
+  return worldWidth * (LEVEL_ENCOUNTER_FROM + step * encountersDone);
+}
+
+// Teleports a group in around the player, ON SCREEN so the arrival is
+// always seen, and locks the street until they are all down.
+function triggerEncounter() {
+  const lane = BOUNDS.bottom - BOUNDS.top;
+  const remaining = LEVEL_MINION_TOTAL - minionsSpawned;
+  const count = Math.min(LEVEL_ENCOUNTER_SIZE, remaining);
+  for (let i = 0; i < count; i++) {
+    // Spread across the visible width, alternating sides of the player so
+    // they arrive both in front of and behind him.
+    let sx;
+    let tries = 0;
+    do {
+      const f = LEVEL_SPAWN_SCREEN_MIN
+        + Math.random() * (LEVEL_SPAWN_SCREEN_MAX - LEVEL_SPAWN_SCREEN_MIN);
+      sx = cameraX + W * f;
+      tries++;
+    } while (Math.abs(sx - player.x) < LEVEL_SPAWN_CLEAR_OF_PLAYER && tries < 12);
+
+    const x = clamp(sx, 40, worldWidth - 40);
+    const y = BOUNDS.top + lane * (0.12 + Math.random() * 0.76);
+    const minion = new Enemy('minion', x, y);
+    minion.spawnTimer = TELEPORT_FRAMES;
+    enemies.push(minion);
+    minionsSpawned++;
+  }
+  encountersDone++;
+  // Hold the player inside the screen they are fighting on.
+  lockUntilX = cameraX + W - LEVEL_LOCK_MARGIN;
+}
+
+// True while an encounter is unresolved: every minion currently in the
+// world must be down before the street opens again.
+function encounterActive() {
+  return lockUntilX > 0
+    && enemies.some((e) => !e.dead && !e.def.boss);
 }
 
 // Camera centres on the player but never scrolls past either end of the
@@ -163,7 +221,11 @@ function spawnEnemies() {
 // than the backdrop pulling away from them.
 function updateCamera() {
   const target = player.x - W / 2;
-  cameraX = clamp(target, 0, Math.max(0, worldWidth - W));
+  let maxX = Math.max(0, worldWidth - W);
+  // Freeze the camera on the locked screen, so the arena the fight happens
+  // in stays put rather than sliding as the player moves within it.
+  if (lockUntilX > 0) maxX = Math.min(maxX, lockUntilX + LEVEL_LOCK_MARGIN - W);
+  cameraX = clamp(target, 0, maxX);
 }
 
 function update() {
@@ -175,14 +237,27 @@ function update() {
     clearPressed();
     return;
   }
-  player.update(Input, BOUNDS);
+  // While an encounter is being fought the street is walled off at
+  // lockUntilX: the player may move freely inside the zone but cannot walk
+  // past it. Passing a tightened BOUNDS is enough -- Player.update already
+  // clamps against it -- so nothing in the entity code needs to know.
+  const bounds = lockUntilX > 0
+    ? { ...BOUNDS, right: Math.min(BOUNDS.right, lockUntilX) }
+    : BOUNDS;
+  player.update(Input, bounds);
   // Only enemies near the player think or move. Distant ones stay put, so
   // a long street costs nothing and nobody sprints in from off-screen.
   for (const enemy of enemies) {
     // A dead enemy still ticks: its death blast has to play out and set
     // `gone` before it can be dropped. Skipping it froze the burst forever.
     if (!enemy.dead && Math.abs(enemy.x - player.x) > ENEMY_ACTIVATE_RANGE) continue;
-    enemy.update(player, BOUNDS);
+    enemy.update(player, bounds);
+  }
+  // Fire the next encounter once the player reaches it, and lift the lock
+  // when the group is cleared.
+  if (!encounterActive()) {
+    lockUntilX = 0;
+    if (player.x >= nextEncounterX()) triggerEncounter();
   }
   resolvePlayerAttacks(player, enemies);
   // Retire finished enemies, leaving a potion behind where one was rolled.
@@ -267,6 +342,23 @@ function draw() {
     const sx = e.x - cameraX;
     return sx > -200 && sx < W + 200 && (!e.dead || e.deathTimer < 90);
   });
+  // The lock's barrier, so the wall reads as deliberate rather than the
+  // player simply sticking at an invisible edge.
+  if (lockUntilX > 0) {
+    const bx = lockUntilX - cameraX;
+    const grad = ctx.createLinearGradient(bx, 0, bx + 40, 0);
+    grad.addColorStop(0, 'rgba(122,215,255,0.30)');
+    grad.addColorStop(1, 'rgba(122,215,255,0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(bx, BOUNDS.top - 90, 40, (BOUNDS.bottom - BOUNDS.top) + 120);
+    ctx.strokeStyle = 'rgba(122,215,255,0.55)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(bx, BOUNDS.top - 90);
+    ctx.lineTo(bx, BOUNDS.bottom + 30);
+    ctx.stroke();
+  }
+
   // Pickups draw under the cast so a character standing on one still reads.
   for (const potion of potions) potion.draw(ctx, cameraX);
   const actors = [player, ...visible].sort((a, b) => a.y - b.y);

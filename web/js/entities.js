@@ -790,6 +790,10 @@ class Enemy {
     this.sawRoll = false;
     // Set once a blast has finished, so the level can drop the enemy.
     this.gone = false;
+    // Teleport arrival. While this counts down the enemy is materialising:
+    // it does not think, move, attack or take hits, so it cannot be killed
+    // before it has finished appearing.
+    this.spawnTimer = 0;
     // Rolled at the moment of death; the level spawns the pickup.
     this.dropsPotion = false;
     this.dead = false;
@@ -862,6 +866,15 @@ class Enemy {
     }
 
     if (this.flashTimer > 0) this.flashTimer--;
+
+    // Materialising: stand inert until the arrival effect finishes.
+    if (this.spawnTimer > 0) {
+      this.spawnTimer--;
+      this.action = 'idle';
+      this.facing = player.x < this.x ? -1 : 1;
+      this.tickAnimTimer();
+      return;
+    }
 
     if (this.hitStun > 0) {
       this.hitStun--;
@@ -1040,6 +1053,8 @@ class Enemy {
 
   takeDamage(amount, fromX = null) {
     if (this.dead) return;
+    // Untouchable until it has finished appearing.
+    if (this.spawnTimer > 0) return;
     this.hp -= amount;
     // The sack absorbs hits without flinching into a hurt clip; it swings
     // away from the blow instead, scaled by how hard the hit was.
@@ -1197,6 +1212,24 @@ class Enemy {
   }
 
   draw(ctx, cameraX = 0) {
+    // Materialising: draw the arrival effect, with the sprite fading up
+    // inside it rather than popping in when the light clears.
+    if (this.spawnTimer > 0) {
+      const frame = this.getSpriteDraw();
+      const height = frame ? frame.sh : 180;
+      const t = 1 - this.spawnTimer / TELEPORT_FRAMES;
+      const alpha = drawTeleport(ctx, this.x - cameraX, this.y, t, height);
+      if (frame && alpha > 0) {
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.translate(this.x - cameraX, this.y);
+        ctx.scale(this.facing, 1);
+        drawSpriteFrame(ctx, frame);
+        ctx.restore();
+      }
+      return;
+    }
+
     // A blasting enemy is replaced by its burst for its whole death, so no
     // body is drawn underneath it.
     if (this.def.blastOnDeath && this.dead) {

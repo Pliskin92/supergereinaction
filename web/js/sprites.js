@@ -131,6 +131,56 @@ const CAR_FX = {
 };
 const CAR_FX_COUNT = 21;
 
+// Minions teleport in rather than standing pre-placed on the street. The
+// arrival is a small blue light that expands into a square, holds, then
+// fades as the minion materialises inside it.
+const TELEPORT_FRAMES = 34;
+// Fraction of the effect spent on the flash before the minion starts
+// fading in, and the point by which it is fully solid.
+const TELEPORT_FLASH_END = 0.35;
+const TELEPORT_SOLID_AT = 0.85;
+
+// Draws the arrival effect at a character's feet. `t` is 0..1 progress.
+// Returns the alpha the minion itself should be drawn at, so the sprite
+// fades up inside the light rather than popping in at the end.
+function drawTeleport(ctx, x, y, t, height) {
+  const p = clamp(t, 0, 1);
+  ctx.save();
+  ctx.translate(x, y);
+
+  // The square: a thin blue outline that snaps open, then dissolves.
+  const grow = p < TELEPORT_FLASH_END ? p / TELEPORT_FLASH_END : 1;
+  const fade = p < TELEPORT_FLASH_END ? 1 : 1 - (p - TELEPORT_FLASH_END) / (1 - TELEPORT_FLASH_END);
+  const h = height * grow;
+  const w = height * 0.42 * grow;
+
+  ctx.globalAlpha = fade * 0.9;
+  ctx.strokeStyle = '#7ad7ff';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(-w / 2, -h, w, h);
+
+  // Inner glow, brightest at the start.
+  ctx.globalAlpha = fade * 0.28;
+  ctx.fillStyle = '#4fb8ff';
+  ctx.fillRect(-w / 2, -h, w, h);
+
+  // A bright horizontal scan line that sweeps up as the body forms.
+  ctx.globalAlpha = fade * 0.95;
+  ctx.strokeStyle = '#dff4ff';
+  ctx.lineWidth = 3;
+  const scanY = -h * clamp(p / TELEPORT_SOLID_AT, 0, 1);
+  ctx.beginPath();
+  ctx.moveTo(-w / 2, scanY);
+  ctx.lineTo(w / 2, scanY);
+  ctx.stroke();
+
+  ctx.restore();
+
+  // Sprite alpha: nothing during the flash, then fades up to solid.
+  if (p < TELEPORT_FLASH_END) return 0;
+  return clamp((p - TELEPORT_FLASH_END) / (TELEPORT_SOLID_AT - TELEPORT_FLASH_END), 0, 1);
+}
+
 // Health potions dropped by defeated enemies.
 const POTION_DROP_CHANCE = 0.10;   // 1 in 10 enemies leaves one
 const POTION_HEAL_FRACTION = 0.10; // restores this much of max health
