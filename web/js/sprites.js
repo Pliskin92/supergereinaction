@@ -143,7 +143,7 @@ const TELEPORT_SOLID_AT = 0.85;
 // Draws the arrival effect at a character's feet. `t` is 0..1 progress.
 // Returns the alpha the minion itself should be drawn at, so the sprite
 // fades up inside the light rather than popping in at the end.
-function drawTeleport(ctx, x, y, t, height) {
+function drawTeleport(ctx, x, y, t, height, colors = TELEPORT_COLOR) {
   const p = clamp(t, 0, 1);
   ctx.save();
   ctx.translate(x, y);
@@ -155,18 +155,18 @@ function drawTeleport(ctx, x, y, t, height) {
   const w = height * 0.42 * grow;
 
   ctx.globalAlpha = fade * 0.9;
-  ctx.strokeStyle = '#7ad7ff';
+  ctx.strokeStyle = colors.edge;
   ctx.lineWidth = 2;
   ctx.strokeRect(-w / 2, -h, w, h);
 
   // Inner glow, brightest at the start.
   ctx.globalAlpha = fade * 0.28;
-  ctx.fillStyle = '#4fb8ff';
+  ctx.fillStyle = colors.glow;
   ctx.fillRect(-w / 2, -h, w, h);
 
   // A bright horizontal scan line that sweeps up as the body forms.
   ctx.globalAlpha = fade * 0.95;
-  ctx.strokeStyle = '#dff4ff';
+  ctx.strokeStyle = colors.scan;
   ctx.lineWidth = 3;
   const scanY = -h * clamp(p / TELEPORT_SOLID_AT, 0, 1);
   ctx.beginPath();
@@ -179,6 +179,40 @@ function drawTeleport(ctx, x, y, t, height) {
   // Sprite alpha: nothing during the flash, then fades up to solid.
   if (p < TELEPORT_FLASH_END) return 0;
   return clamp((p - TELEPORT_FLASH_END) / (TELEPORT_SOLID_AT - TELEPORT_FLASH_END), 0, 1);
+}
+
+// The player's respawn arrival: the same teleport shape as a minion's, but
+// red, so a death read differently from an enemy turning up.
+const RESPAWN_TELEPORT_COLOR = {
+  edge: '#ff6a6a',
+  glow: '#c81f2e',
+  scan: '#ffdede',
+};
+const TELEPORT_COLOR = {
+  edge: '#7ad7ff',
+  glow: '#4fb8ff',
+  scan: '#dff4ff',
+};
+
+// A life pip in the HUD. Filled while the life is in hand, hollow once
+// spent, so the count reads at a glance.
+function drawHeart(ctx, x, y, size, filled) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(size / 12, size / 12);
+  ctx.beginPath();
+  ctx.moveTo(0, 4);
+  ctx.bezierCurveTo(-7, -3, -4, -8, 0, -4);
+  ctx.bezierCurveTo(4, -8, 7, -3, 0, 4);
+  ctx.closePath();
+  if (filled) {
+    ctx.fillStyle = '#e84c4c';
+    ctx.fill();
+  }
+  ctx.strokeStyle = filled ? '#ffb3b3' : 'rgba(255,255,255,0.35)';
+  ctx.lineWidth = 1.6;
+  ctx.stroke();
+  ctx.restore();
 }
 
 // Health potions dropped by defeated enemies.

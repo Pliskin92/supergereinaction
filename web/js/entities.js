@@ -126,6 +126,19 @@ const PLAYER_HEAVY_HIT_GAP = 9;
 const HIT_STUN_FRAMES = 26;
 // Immunity after taking a hit, so a crowd cannot delete you in one frame.
 const PLAYER_INVULN_FRAMES = 20;
+// Lives. Running out of health costs one and the player returns; running
+// out of lives ends the run.
+const PLAYER_LIVES = 5;
+// The death pause before the respawn teleport begins, and how long that
+// arrival takes.
+const PLAYER_DEATH_FRAMES = 46;
+// Coming back is a rescue, not a reset: SuperGere arrives already
+// transformed with a half-full meter, so the player is handed a fighting
+// chance rather than dropped back in at square one.
+const RESPAWN_FURY_FRACTION = 0.5;
+// Grace period after arriving, so a crowd cannot delete the new life on
+// the frame it appears.
+const RESPAWN_INVULN_FRAMES = 90;
 // A whole enemy walk clip, in ticks. The sheets are 25 frames, so this is
 // how long one full stride takes: low values read as a frantic shuffle.
 const ENEMY_WALK_CYCLE_FRAMES = 110;
@@ -254,6 +267,14 @@ class Player {
     this.walkPhase = 0;
     this.hitStun = 0;
     this.invuln = 0;
+    // Lives left, and the death/respawn sequence. deathTimer counts the
+    // pause; respawnTimer counts the teleport arrival.
+    this.lives = PLAYER_LIVES;
+    this.dead = false;
+    this.deathTimer = 0;
+    this.respawnTimer = 0;
+    // Set once every life is spent; the level reads it to end the run.
+    this.gameOver = false;
     this.attackHit = false; // whether current attack already landed
     // How many times the current swing has connected, and the animTimer
     // tick of the last one. A multi-hit box (the heavy) compares against
@@ -469,6 +490,48 @@ class Player {
     // hurt animation either.
     this.punchBuffer = 0;
     this.vx = (this.x < fromX ? -1 : 1) * 1.5;
+
+    if (this.hp <= 0) this.die();
+  }
+
+  // Spends a life. The run ends when there are none left.
+  die() {
+    if (this.dead) return;
+    this.dead = true;
+    this.deathTimer = PLAYER_DEATH_FRAMES;
+    this.respawnTimer = 0;
+    this.action = 'hurt';
+    this.animTimer = 0;
+    this.moveTimer = 0;
+    this.vx = 0;
+    // A transformation does not survive death.
+    if (this.furyActive) this.endFury();
+    this.lives--;
+    if (this.lives <= 0) this.gameOver = true;
+  }
+
+  // Called when the respawn teleport finishes: SuperGere comes back with a
+  // half-full meter (see RESPAWN_FURY_FRACTION).
+  respawn() {
+    this.dead = false;
+    this.deathTimer = 0;
+    this.respawnTimer = 0;
+    this.hp = this.maxHp;
+    this.action = 'idle';
+    this.animTimer = 0;
+    this.moveTimer = 0;
+    this.invuln = RESPAWN_INVULN_FRAMES;
+    this.attackHit = false;
+    this.attackHitCount = 0;
+    this.comboStep = 0;
+    this.fury = FURY_MAX;
+    // startFury() refills to full and swaps the sprite; the meter is then
+    // set back to half so the transformation is on a short clock.
+    this.startFury();
+    this.fury = FURY_MAX * RESPAWN_FURY_FRACTION;
+    if (this.furyActive) {
+      this.furyTimer = Math.round(FURY_ACTIVE_FRAMES * RESPAWN_FURY_FRACTION);
+    }
   }
 
   // bounds: { left, right, top, bottom } — left/right clamp world-space x
@@ -476,6 +539,23 @@ class Player {
   // clamp y exactly as before. All movement/collision math here stays in
   // world space; only draw() converts to screen space via cameraX.
   update(input, bounds) {
+    // Dead: hold still through the death pause, then the teleport arrival,
+    // then come back. Nothing else runs -- no input, no movement, no
+    // attacks -- until the sequence finishes.
+    if (this.dead) {
+      if (this.gameOver) return;
+      if (this.deathTimer > 0) {
+        this.deathTimer--;
+        if (this.deathTimer === 0) this.respawnTimer = TELEPORT_FRAMES;
+        return;
+      }
+      if (this.respawnTimer > 0) {
+        this.respawnTimer--;
+        if (this.respawnTimer === 0) this.respawn();
+      }
+      return;
+    }
+
     let dx = 0, dy = 0;
 
     // Counts down regardless of hitstun/action: the 20 seconds are wall
@@ -641,6 +721,28 @@ class Player {
   // Defaults to 0 so callers that don't scroll (none left, but safe) still work.
   draw(ctx, cameraX = 0) {
     const sx = this.x - cameraX;
+
+    // Dead: nothing is drawn during the pause, then the red teleport plays
+    // with the sprite fading up inside it, mirroring how minions arrive.
+    if (this.dead) {
+      if (this.gameOver || this.respawnTimer <= 0) return;
+      const frame = this.getSpriteDraw();
+      const height = frame ? frame.sh : 170;
+      const t = 1 - this.respawnTimer / TELEPORT_FRAMES;
+      const alpha = drawTeleport(
+        ctx, sx, this.y, t, height, RESPAWN_TELEPORT_COLOR,
+      );
+      if (frame && alpha > 0) {
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.translate(sx, this.y);
+        ctx.scale(this.facing, 1);
+        drawSpriteFrame(ctx, frame);
+        ctx.restore();
+      }
+      return;
+    }
+
     ctx.save();
     if (this.invuln > 0 && Math.floor(this.invuln / 3) % 2 === 0) {
       ctx.globalAlpha = 0.4;
@@ -722,7 +824,7 @@ const EnemyTypes = {
     // Minions pop and vanish when beaten rather than leaving a body on a
     // street the player walks the length of.
     blastOnDeath: true,
-    hp: 25, speed: 0.7, damage: 6, contactRange: 46, color: { suit: '#38424f', accent: '#7d92a8', skin: Palette.skin, hair: '#333' },
+    hp: 25, speed: 0.7, damage: 3, contactRange: 46, color: { suit: '#38424f', accent: '#7d92a8', skin: Palette.skin, hair: '#333' },
     scoreValue: 100,
     spriteCharacter: 'minion',
     // No sheet has an explicit hurt clip — hurt is conveyed purely via the

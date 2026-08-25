@@ -99,6 +99,8 @@ window.addEventListener('keydown', (e) => {
     // landing and taking hits. Forcing it is an arena-only convenience.
     // Root-relative: this page sets <base href="/">.
     if (e.key === 'Escape') window.location.href = '/index.html';
+    // Enter restarts the level once every life is spent.
+    if (e.key === 'Enter' && player.gameOver) window.location.reload();
   }
   heldKeys.add(e.key);
   if ([' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) e.preventDefault();
@@ -296,6 +298,11 @@ function drawHud() {
   ctx.textAlign = 'left';
   ctx.fillText(t('level1Title'), 12, 12);
 
+  // Lives, as hearts beside the health bar.
+  for (let i = 0; i < PLAYER_LIVES; i++) {
+    drawHeart(ctx, 18 + i * 15, 22, 12, i < player.lives);
+  }
+
   // Player health.
   ctx.fillStyle = 'rgba(0,0,0,0.55)';
   ctx.fillRect(12, 28, 120, 7);
@@ -327,6 +334,25 @@ function drawHud() {
   ctx.fillRect(12, py, 120, 4);
   ctx.fillStyle = '#8a8ad0';
   ctx.fillRect(12, py, 120 * pct, 4);
+  ctx.restore();
+}
+
+// Drawn over everything once the last life is spent.
+function drawGameOver() {
+  ctx.save();
+  ctx.fillStyle = 'rgba(10,8,14,0.72)';
+  ctx.fillRect(0, 0, W, H);
+  ctx.textAlign = 'center';
+  ctx.font = 'bold 46px Impact, "Arial Black", sans-serif';
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = 8;
+  ctx.strokeStyle = '#1a1020';
+  ctx.strokeText(t('gameOver'), W / 2, H / 2);
+  ctx.fillStyle = '#e84c4c';
+  ctx.fillText(t('gameOver'), W / 2, H / 2);
+  ctx.font = 'bold 14px monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.75)';
+  ctx.fillText(t('gameOverHint'), W / 2, H / 2 + 34);
   ctx.restore();
 }
 
@@ -366,6 +392,7 @@ function draw() {
   ctx.restore();
   drawHud();
   furyPopup.draw(ctx, W, H);
+  if (player.gameOver) drawGameOver();
 }
 
 function loop() {

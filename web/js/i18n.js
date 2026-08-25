@@ -23,6 +23,8 @@ const Strings = {
     // Kept in English in both languages: they are the cartoon title cards.
     level1Title: 'LIVELLO 1 — LA STRADA',
     loading: 'CARICAMENTO...',
+    gameOver: 'GAME OVER',
+    gameOverHint: 'INVIO PER RICOMINCIARE',
     furyOn: 'SUPER GERE TRANSFORMATION!!',
     furyOff: 'SUPER GERE IS OFF! :(',
     gymTitle: 'GYM — FREE PLAY',
@@ -41,6 +43,8 @@ const Strings = {
     fury: 'FURIA',
     level1Title: 'LIVELLO 1 — LA STRADA',
     loading: 'CARICAMENTO...',
+    gameOver: 'GAME OVER',
+    gameOverHint: 'INVIO PER RICOMINCIARE',
     furyOn: 'SUPER GERE TRANSFORMATION!!',
     furyOff: 'SUPER GERE IS OFF! :(',
     gymTitle: 'PALESTRA — GIOCO LIBERO',
