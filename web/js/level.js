@@ -269,7 +269,9 @@ function update() {
   // Retire finished enemies, leaving a potion behind where one was rolled.
   if (enemies.some((e) => e.gone)) {
     for (const e of enemies) {
-      if (e.gone && e.dropsPotion) potions.push(new Potion(e.x, e.y));
+      if (e.gone && e.dropsPotion) {
+        potions.push(new Potion(e.x, e.y, e.dropsPotion));
+      }
     }
     enemies = enemies.filter((e) => !e.gone);
   }

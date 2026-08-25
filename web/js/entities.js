@@ -607,7 +607,14 @@ class Player {
         }
         if (this.deathTimer === 0) {
           this.respawnTimer = TELEPORT_FRAMES;
-          if (!this.gameOver) this.deathEvent = 'comeback';
+          if (!this.gameOver) {
+            this.deathEvent = 'comeback';
+            // Stand up for the arrival: the teleport must materialise Gere
+            // on his feet, not fade the collapsed body back in.
+            this.action = 'idle';
+            this.animTimer = 0;
+            this.spriteCharacter = PLAYER_FURY_CHARACTER;
+          }
         }
         return;
       }
@@ -980,8 +987,9 @@ class Enemy {
     // it does not think, move, attack or take hits, so it cannot be killed
     // before it has finished appearing.
     this.spawnTimer = 0;
-    // Rolled at the moment of death; the level spawns the pickup.
-    this.dropsPotion = false;
+    // Rolled at the moment of death: null, 'health' or 'fury'. The level
+    // spawns the pickup.
+    this.dropsPotion = null;
     this.dead = false;
     this.deathTimer = 0;
     this.flashTimer = 0;
@@ -1363,8 +1371,19 @@ class Enemy {
       this.action = 'ko';
       this.deathTimer = 0;
       // Roll for a drop once, here, rather than when the body is cleared:
-      // the result must not change if the death is re-evaluated.
-      this.dropsPotion = Math.random() < POTION_DROP_CHANCE;
+      // the result must not change if the death is re-evaluated. The rare
+      // fury potion is checked first so its 5% is flat, not a slice of the
+      // health potion's chance.
+      // One roll over a single 0..1 range, so each chance is exact rather
+      // than being conditioned on the other's failure.
+      const roll = Math.random();
+      if (roll < FURY_POTION_DROP_CHANCE) {
+        this.dropsPotion = 'fury';
+      } else if (roll < FURY_POTION_DROP_CHANCE + POTION_DROP_CHANCE) {
+        this.dropsPotion = 'health';
+      } else {
+        this.dropsPotion = null;
+      }
     }
   }
 
@@ -1699,9 +1718,11 @@ function resolvePlayerAttacks(player, enemies) {
 
 // A health pickup left behind by a defeated enemy. Walk over it to drink.
 class Potion {
-  constructor(x, y) {
+  // kind: 'health' restores a slice of health, 'fury' fills the meter.
+  constructor(x, y, kind = 'health') {
     this.x = x;
     this.y = y;
+    this.kind = kind;
     this.phase = Math.random() * 6;
     this.taken = false;
   }
@@ -1712,6 +1733,15 @@ class Potion {
     this.phase += POTION_BOB_SPEED;
     if (Math.hypot(player.x - this.x, player.y - this.y) > POTION_PICKUP_RANGE) {
       return false;
+    }
+    if (this.kind === 'fury') {
+      // Pointless while already transformed -- the meter is spent then --
+      // so it is left on the ground rather than wasted.
+      if (player.furyActive || !player.canFury()) return false;
+      this.taken = true;
+      player.fury = FURY_MAX;
+      player.startFury();
+      return true;
     }
     // Only worth picking up if it would actually heal something.
     if (player.hp >= player.maxHp) return false;
@@ -1724,7 +1754,7 @@ class Potion {
 
   draw(ctx, cameraX = 0) {
     if (this.taken) return;
-    drawPotion(ctx, this.x - cameraX, this.y, this.phase);
+    drawPotion(ctx, this.x - cameraX, this.y, this.phase, this.kind);
   }
 }
 

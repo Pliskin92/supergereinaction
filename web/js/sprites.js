@@ -216,35 +216,46 @@ function drawHeart(ctx, x, y, size, filled) {
 }
 
 // Health potions dropped by defeated enemies.
-const POTION_DROP_CHANCE = 0.10;   // 1 in 10 enemies leaves one
+const POTION_DROP_CHANCE = 0.20;   // 1 in 5 enemies leaves a health potion
 const POTION_HEAL_FRACTION = 0.10; // restores this much of max health
+// A rarer red potion fills the FURY meter outright. Rolled separately and
+// checked first, so it is a flat 5% rather than a slice of the health
+// potion's chance.
+const FURY_POTION_DROP_CHANCE = 0.05;
 const POTION_PICKUP_RANGE = 46;
 const POTION_BOB_SPEED = 0.09;
 
 // Drawn procedurally: a small flask with a glow, so it reads as a pickup
 // against a busy street without needing art of its own.
-function drawPotion(ctx, x, y, phase) {
+// `kind` is 'health' (green) or 'fury' (red).
+const POTION_COLORS = {
+  health: { dark: '#2f6b34', light: '#5ac85a', glow: '#5ac85a' },
+  fury: { dark: '#7a1f2a', light: '#e8453f', glow: '#ff6a3d' },
+};
+
+function drawPotion(ctx, x, y, phase, kind = 'health') {
+  const c = POTION_COLORS[kind] || POTION_COLORS.health;
   const bob = Math.sin(phase) * 4;
   ctx.save();
   ctx.translate(x, y + bob);
 
   // glow
   ctx.globalAlpha = 0.30 + Math.sin(phase * 1.6) * 0.10;
-  ctx.fillStyle = '#5ac85a';
+  ctx.fillStyle = c.glow;
   ctx.beginPath();
   ctx.arc(0, -10, 18, 0, Math.PI * 2);
   ctx.fill();
   ctx.globalAlpha = 1;
 
   // flask body
-  ctx.fillStyle = '#2f6b34';
+  ctx.fillStyle = c.dark;
   rr(ctx, -8, -18, 16, 18, 5);
   ctx.fill();
-  ctx.fillStyle = '#5ac85a';
+  ctx.fillStyle = c.light;
   rr(ctx, -6, -12, 12, 11, 4);
   ctx.fill();
   // neck + cork
-  ctx.fillStyle = '#2f6b34';
+  ctx.fillStyle = c.dark;
   ctx.fillRect(-3, -24, 6, 7);
   ctx.fillStyle = '#c9963f';
   ctx.fillRect(-4, -27, 8, 4);
