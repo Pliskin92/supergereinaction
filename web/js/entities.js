@@ -156,8 +156,19 @@ const ENEMY_ATTACK_STRIKE_TICK = 9;
 // they have closed the distance they throw a flurry, then back off for a
 // beat. That gives an opening to punish without letting them chip away at
 // you one endless jab at a time.
-const ENEMY_COMBO_MIN = 2;
-const ENEMY_COMBO_MAX = 3;
+//
+// Two patterns, picked evenly: a punch-punch-kick combo, or a single heavy
+// smash. Damage is per blow, so the combo trades a slower total for three
+// chances to connect while the smash is one committed hit.
+const ENEMY_PATTERN_COMBO = [
+  { clip: 'attack', damage: 4 },
+  { clip: 'attack', damage: 4 },
+  { clip: 'kick', damage: 6 },
+];
+const ENEMY_PATTERN_SMASH = [
+  { clip: 'heavy', damage: 8 },
+];
+const ENEMY_SMASH_CHANCE = 0.5;
 // Gap between blows WITHIN a flurry -- short, so it reads as a combo.
 const ENEMY_COMBO_GAP = 6;
 // Pause after a whole flurry finishes, before they may start another.
@@ -856,6 +867,8 @@ const EnemyTypes = {
       idle: { key: 'idle_right', loop: false, holdFrames: 1 },
       walk: { key: 'walk_right', loop: true, cycleFrames: ENEMY_WALK_CYCLE_FRAMES },
       attack: { key: 'punch', loop: false, holdFrames: ENEMY_ATTACK_FRAMES },
+      kick: { key: 'kick', loop: false, holdFrames: ENEMY_ATTACK_FRAMES },
+      heavy: { key: 'heavy', loop: false, holdFrames: ENEMY_ATTACK_FRAMES },
       // Keys are canonical action names (SpriteAnims is keyed by those, not
       // by folder); SPRITE_FOLDER_ALIASES maps them to the capitalised
       // folders on disk.
@@ -897,7 +910,10 @@ class Enemy {
     // contact frame has already dealt damage this swing.
     this.attackTimer = 0;
     this.attackLanded = false;
-    // Blows left in the current flurry, and the pause before the next one.
+    // The attack pattern being thrown and how far through it we are.
+    // comboLeft is derived from these; see startPattern()/currentBlow().
+    this.pattern = null;
+    this.patternStep = 0;
     this.comboLeft = 0;
     this.comboGap = 0;
     // Counts down while squaring up before a swing.
@@ -1023,7 +1039,7 @@ class Enemy {
     // Mid-attack: play the clip out, landing the blow at its contact frame
     // rather than the instant the swing starts. The enemy holds position
     // while swinging, so an attack is a commitment it can be punished for.
-    if (this.action === 'attack') {
+    if (this.isAttacking()) {
       this.attackTimer--;
       const strikeAt = this.punishing
         ? ENEMY_PUNISH_STRIKE_TICK : ENEMY_ATTACK_STRIKE_TICK;
@@ -1036,12 +1052,13 @@ class Enemy {
         const reach = ENEMY_STRIKE_REACH
           + (this.punishing ? ENEMY_PUNISH_REACH_BONUS : 0);
         if (dist <= reach) {
-          player.takeDamage(this.def.damage, this.x);
+          player.takeDamage(this.blowDamage(), this.x);
         }
       }
       if (this.attackTimer <= 0) {
         this.punishing = false;
         this.comboLeft--;
+        this.patternStep++;
         if (this.comboLeft > 0 && dist <= ENEMY_ATTACK_COMMIT_RANGE) {
           // Still swinging: brief gap, then the next blow of the flurry.
           this.action = 'idle';
@@ -1070,11 +1087,7 @@ class Enemy {
       if (dist > ENEMY_ATTACK_COMMIT_RANGE + 40) {
         this.windup = 0;
       } else if (this.windup === 0) {
-        this.action = 'attack';
-        this.attackTimer = ENEMY_ATTACK_FRAMES;
-        this.attackLanded = false;
-        this.comboLeft = ENEMY_COMBO_MIN
-          + Math.floor(Math.random() * (ENEMY_COMBO_MAX - ENEMY_COMBO_MIN + 1));
+        this.startPattern();
       }
       this.tickAnimTimer();
       this.x = clamp(this.x, bounds.left, bounds.right);
@@ -1088,7 +1101,7 @@ class Enemy {
     const rolling = player.action === 'slide' && player.moveTimer > 0;
     if (!rolling) {
       this.sawRoll = false;
-    } else if (!this.sawRoll && !this.punishing && this.action !== 'attack'
+    } else if (!this.sawRoll && !this.punishing && !this.isAttacking()
         && this.attackCooldown <= 0 && this.hasAttackClip()
         && dist <= ENEMY_ROLL_PUNISH_RANGE) {
       this.sawRoll = true;
@@ -1110,9 +1123,7 @@ class Enemy {
       // gap elapses, so the burst stays tight.
       if (this.comboGap === 0 && this.comboLeft > 0
           && dist <= ENEMY_ATTACK_COMMIT_RANGE) {
-        this.action = 'attack';
-        this.attackTimer = ENEMY_ATTACK_FRAMES;
-        this.attackLanded = false;
+        this.throwBlow();
       } else {
         this.action = 'idle';
       }
@@ -1159,6 +1170,52 @@ class Enemy {
     if (!ko) return 0;
     const loaded = SpriteAnims[this.def.spriteCharacter];
     return loaded && loaded[ko.key] ? ko.holdFrames : 0;
+  }
+
+  // Picks an attack pattern and throws its first blow. Half the time a
+  // punch-punch-kick combo, half a single heavy smash.
+  startPattern() {
+    const smash = Math.random() < ENEMY_SMASH_CHANCE
+      && this.hasClip(ENEMY_PATTERN_SMASH[0].clip);
+    this.pattern = smash ? ENEMY_PATTERN_SMASH : ENEMY_PATTERN_COMBO;
+    this.patternStep = 0;
+    this.comboLeft = this.pattern.length;
+    this.throwBlow();
+  }
+
+  // Starts the clip for the blow at the current step.
+  throwBlow() {
+    const blow = this.currentBlow();
+    this.action = blow && this.hasClip(blow.clip) ? blow.clip : 'attack';
+    this.attackTimer = ENEMY_ATTACK_FRAMES;
+    this.attackLanded = false;
+  }
+
+  // True while any attack clip is playing, whichever the pattern chose.
+  isAttacking() {
+    return this.action === 'attack' || this.action === 'kick'
+      || this.action === 'heavy';
+  }
+
+  currentBlow() {
+    if (!this.pattern) return null;
+    return this.pattern[Math.min(this.patternStep, this.pattern.length - 1)];
+  }
+
+  // Damage of the blow being thrown, falling back to the type's own value
+  // for an enemy with no pattern (the boss).
+  blowDamage() {
+    const blow = this.currentBlow();
+    return blow ? blow.damage : this.def.damage;
+  }
+
+  // Whether a given spriteAnimMap entry has art behind it.
+  hasClip(name) {
+    const map = this.def.spriteAnimMap;
+    const entry = map && map[name];
+    if (!entry) return false;
+    const loaded = SpriteAnims[this.def.spriteCharacter];
+    return !!(loaded && loaded[entry.key]);
   }
 
   // Whether this enemy has an attack clip to play. One without simply
