@@ -153,6 +153,24 @@ const ENEMY_ATTACK_COOLDOWN = 78;
 // than the art so a hit has to reach the body rather than clipping the
 // outermost pixel of a swinging limb or cape.
 const ENEMY_HURTBOX_WIDTH = 0.62;
+// An enemy commits to a swing from this far out -- comparable to the reach
+// of the player's own attacks, so they start swinging as you close rather
+// than waiting until they are touching you. Whether the blow LANDS is a
+// separate question, decided at its contact frame: committing early means
+// they can whiff, which is what gives you something to step around.
+const ENEMY_ATTACK_COMMIT_RANGE = 150;
+// Rolling is movement, not invulnerability: it evades by carrying you out
+// of reach, so an enemy that reads the roll and answers with a longer move
+// can still catch you. These govern that punish.
+//
+// How far away an enemy will still react to a roll, how likely it is to
+// try, and the reach/duration of the counter itself -- longer than an
+// ordinary jab, which is what lets it cover the ground you rolled across.
+const ENEMY_ROLL_PUNISH_RANGE = 210;
+const ENEMY_ROLL_PUNISH_CHANCE = 0.55;
+const ENEMY_PUNISH_FRAMES = 26;
+const ENEMY_PUNISH_STRIKE_TICK = 12;
+const ENEMY_PUNISH_REACH_BONUS = 74;
 // How long a minion's collapse plays before its blast clears it away. The
 // fall clip is 25 frames; this paces it so the body actually drops rather
 // than snapping to the ground.
@@ -756,6 +774,11 @@ class Enemy {
     // Blows left in the current flurry, and the pause before the next one.
     this.comboLeft = 0;
     this.comboGap = 0;
+    // True while swinging a roll-punish: a longer, further-reaching move
+    // thrown in answer to the player rolling.
+    this.punishing = false;
+    // Latches so one roll draws at most one punish attempt.
+    this.sawRoll = false;
     // Set once a blast has finished, so the level can drop the enemy.
     this.gone = false;
     // Rolled at the moment of death; the level spawns the pickup.
@@ -858,17 +881,24 @@ class Enemy {
     // while swinging, so an attack is a commitment it can be punished for.
     if (this.action === 'attack') {
       this.attackTimer--;
-      if (!this.attackLanded && this.animTimer >= ENEMY_ATTACK_STRIKE_TICK) {
+      const strikeAt = this.punishing
+        ? ENEMY_PUNISH_STRIKE_TICK : ENEMY_ATTACK_STRIKE_TICK;
+      if (!this.attackLanded && this.animTimer >= strikeAt) {
         this.attackLanded = true;
-        // Only connects if the player is still in reach at contact -- so
-        // stepping out of a telegraphed swing avoids it.
-        if (dist <= this.def.contactRange + 10) {
+        // A punish reaches further than a jab, which is what lets it catch
+        // someone mid-roll. An ordinary swing only connects if the player
+        // is still in reach at contact, so a telegraphed blow can be
+        // stepped out of.
+        const reach = this.def.contactRange + 10
+          + (this.punishing ? ENEMY_PUNISH_REACH_BONUS : 0);
+        if (dist <= reach) {
           player.takeDamage(this.def.damage, this.x);
         }
       }
       if (this.attackTimer <= 0) {
+        this.punishing = false;
         this.comboLeft--;
-        if (this.comboLeft > 0 && dist <= this.def.contactRange + 24) {
+        if (this.comboLeft > 0 && dist <= ENEMY_ATTACK_COMMIT_RANGE) {
           // Still swinging: brief gap, then the next blow of the flurry.
           this.action = 'idle';
           this.comboGap = ENEMY_COMBO_GAP;
@@ -886,12 +916,35 @@ class Enemy {
     }
 
     if (this.attackCooldown > 0) this.attackCooldown--;
+
+    // Read the roll. The moment the player commits to one, an enemy in
+    // range may answer with a longer swing that covers the ground the roll
+    // crosses -- so rolling past someone is a risk, not a free escape.
+    const rolling = player.action === 'slide' && player.moveTimer > 0;
+    if (!rolling) {
+      this.sawRoll = false;
+    } else if (!this.sawRoll && !this.punishing && this.action !== 'attack'
+        && this.attackCooldown <= 0 && this.hasAttackClip()
+        && dist <= ENEMY_ROLL_PUNISH_RANGE) {
+      this.sawRoll = true;
+      if (Math.random() < ENEMY_ROLL_PUNISH_CHANCE) {
+        this.action = 'attack';
+        this.punishing = true;
+        this.attackTimer = ENEMY_PUNISH_FRAMES;
+        this.attackLanded = false;
+        this.comboLeft = 1;
+        this.comboGap = 0;
+        this.tickAnimTimer();
+        return;
+      }
+    }
+
     if (this.comboGap > 0) {
       this.comboGap--;
       // Mid-flurry: hold position and throw the next blow the moment the
       // gap elapses, so the burst stays tight.
       if (this.comboGap === 0 && this.comboLeft > 0
-          && dist <= this.def.contactRange + 24) {
+          && dist <= ENEMY_ATTACK_COMMIT_RANGE) {
         this.action = 'attack';
         this.attackTimer = ENEMY_ATTACK_FRAMES;
         this.attackLanded = false;
@@ -902,7 +955,7 @@ class Enemy {
       return;
     }
 
-    if (dist > this.def.contactRange) {
+    if (dist > ENEMY_ATTACK_COMMIT_RANGE) {
       const speed = this.def.speed;
       this.x += (dx / dist) * speed;
       this.y += (dy / dist) * speed;
@@ -917,6 +970,14 @@ class Enemy {
       // Commit to a flurry of a few blows rather than one jab.
       this.comboLeft = ENEMY_COMBO_MIN
         + Math.floor(Math.random() * (ENEMY_COMBO_MAX - ENEMY_COMBO_MIN + 1));
+    } else if (dist > this.def.contactRange) {
+      // In swinging range but on cooldown: keep closing, so they press you
+      // instead of hovering at the edge of their reach.
+      const speed = this.def.speed * 0.6;
+      this.x += (dx / dist) * speed;
+      this.y += (dy / dist) * speed;
+      this.action = 'walk';
+      this.walkPhase += 0.2;
     } else {
       this.action = 'idle';
     }
@@ -1303,14 +1364,28 @@ function resolvePlayerAttacks(player, enemies) {
   // the wind-up.
   if (player.isPunching() && !player.punchHasStruck()) return 0;
 
-  let hits = 0;
+  // One strike hits ONE target. A swing that overlaps a crowd connects with
+  // whoever is closest rather than damaging the whole group at once -- a
+  // punch is a punch, not a sweep. The heavy still gets two strikes, but
+  // each picks its own single target.
+  let target = null;
+  let targetDist = Infinity;
   for (const enemy of enemies) {
     if (enemy.dead) continue;
     // A glancing touch is not a hit: the swing has to cover enough of the
     // target for the blow to read as landing on them.
     if (boxCoverage(box, enemy.getHitbox()) < HIT_COVERAGE_REQUIRED) continue;
-    enemy.takeDamage(box.damage, player.x);
-    hits++;
+    const d = Math.hypot(enemy.x - player.x, enemy.y - player.y);
+    if (d < targetDist) {
+      targetDist = d;
+      target = enemy;
+    }
+  }
+
+  let hits = 0;
+  if (target) {
+    target.takeDamage(box.damage, player.x);
+    hits = 1;
   }
   if (hits > 0) {
     player.attackHitCount++;
