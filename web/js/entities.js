@@ -164,13 +164,18 @@ const ENEMY_ATTACK_STRIKE_TICK = 9;
 // Two patterns, picked evenly: a punch-punch-kick combo, or a single heavy
 // smash. Damage is per blow, so the combo trades a slower total for three
 // chances to connect while the smash is one committed hit.
+// `reach` is how far each blow connects, mirroring the player's own moves
+// (punch 132, kick 118, heavy 168). Every blow previously shared one flat
+// 112px, so a minion's heavy -- a big lunging animation -- had a jab's
+// range and had to be almost inside Gere to land while his own heavy hit
+// from 56px further out.
 const ENEMY_PATTERN_COMBO = [
-  { clip: 'attack', damage: 4 },
-  { clip: 'attack', damage: 4 },
-  { clip: 'kick', damage: 6 },
+  { clip: 'attack', damage: 4, reach: 126 },
+  { clip: 'attack', damage: 4, reach: 126 },
+  { clip: 'kick', damage: 6, reach: 132 },
 ];
 const ENEMY_PATTERN_SMASH = [
-  { clip: 'heavy', damage: 8 },
+  { clip: 'heavy', damage: 8, reach: 168 },
 ];
 const ENEMY_SMASH_CHANCE = 0.5;
 // Gap between blows WITHIN a flurry -- short, so it reads as a combo.
@@ -189,7 +194,13 @@ const ENEMY_HURTBOX_WIDTH = 0.62;
 // approach was already 38px short before it started -- they flailed at the
 // air the whole way in and only ever connected when the player walked into
 // them. Committing inside their reach means a swing is a real threat.
-const ENEMY_ATTACK_COMMIT_RANGE = 118;
+// Committing has to allow for the longest blow an enemy might throw: at
+// 118 they closed inside their own heavy's 168px reach before swinging,
+// throwing away the range that move is meant to have.
+const ENEMY_ATTACK_COMMIT_RANGE = 150;
+// Below this they stop closing and hold their ground, so they do not walk
+// into the player's face when a longer blow would have served.
+const ENEMY_PREFERRED_GAP = 96;
 
 // Before swinging, an enemy squares up for a moment. This is what turns a
 // contact into a telegraphed attack: you get a beat to see it coming and
@@ -1086,7 +1097,7 @@ class Enemy {
         // someone mid-roll. An ordinary swing only connects if the player
         // is still in reach at contact, so a telegraphed blow can be
         // stepped out of.
-        const reach = ENEMY_STRIKE_REACH
+        const reach = this.blowReach()
           + (this.punishing ? ENEMY_PUNISH_REACH_BONUS : 0);
         if (dist <= reach) {
           player.takeDamage(this.blowDamage(), this.x);
@@ -1183,7 +1194,7 @@ class Enemy {
       // landing the instant they arrive.
       this.windup = ENEMY_WINDUP_FRAMES;
       this.action = 'idle';
-    } else if (dist > this.def.contactRange) {
+    } else if (dist > ENEMY_PREFERRED_GAP) {
       // In swinging range but on cooldown: keep closing, so they press you
       // instead of hovering at the edge of their reach.
       const speed = this.def.speed * 0.6;
@@ -1244,6 +1255,13 @@ class Enemy {
   blowDamage() {
     const blow = this.currentBlow();
     return blow ? blow.damage : this.def.damage;
+  }
+
+  // How far the blow being thrown reaches. Enemies without a pattern keep
+  // the generic strike reach.
+  blowReach() {
+    const blow = this.currentBlow();
+    return blow && blow.reach ? blow.reach : ENEMY_STRIKE_REACH;
   }
 
   // Whether a given spriteAnimMap entry has art behind it.
