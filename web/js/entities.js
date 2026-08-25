@@ -159,6 +159,15 @@ const ENEMY_HURTBOX_WIDTH = 0.62;
 // separate question, decided at its contact frame: committing early means
 // they can whiff, which is what gives you something to step around.
 const ENEMY_ATTACK_COMMIT_RANGE = 150;
+
+// How far a swing actually reaches at its contact frame.
+//
+// This used to be contactRange + 10 -- 56px for a minion. Two ~60px-wide
+// sprites standing side by side already have their centres ~59px apart, so
+// that range could not be met without the two overlapping: the enemy had
+// to be inside you before a blow would register. It is now a real arm's
+// length, in the same territory as the player's own ~120px punch.
+const ENEMY_STRIKE_REACH = 112;
 // Rolling is movement, not invulnerability: it evades by carrying you out
 // of reach, so an enemy that reads the roll and answers with a longer move
 // can still catch you. These govern that punish.
@@ -889,7 +898,7 @@ class Enemy {
         // someone mid-roll. An ordinary swing only connects if the player
         // is still in reach at contact, so a telegraphed blow can be
         // stepped out of.
-        const reach = this.def.contactRange + 10
+        const reach = ENEMY_STRIKE_REACH
           + (this.punishing ? ENEMY_PUNISH_REACH_BONUS : 0);
         if (dist <= reach) {
           player.takeDamage(this.def.damage, this.x);
