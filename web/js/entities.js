@@ -95,6 +95,23 @@ const PLAYER_SLIDE_DURATION = 28;
 // (a light punch and a heavy each give exactly 1). At 100% the player
 // transforms immediately: the sprite character swaps to the supergere
 // pack for FURY_ACTIVE_FRAMES, then reverts.
+// ---- Scoring ----
+// How long after a kill the next one still counts as part of the same
+// chain. Two seconds is long enough to cross a screen to the next minion
+// but short enough that the chain breaks when the player stops to heal or
+// waits out the boss's shield.
+const SCORE_COMBO_WINDOW = 120;
+// A chain multiplies the base value by its length, capped so a long pack
+// does not run away with the scoreboard.
+const SCORE_COMBO_MAX = 8;
+// End-of-level bonuses: per life still held, and per second under the par
+// time. Both are round numbers so the summary is readable at a glance.
+const SCORE_LIFE_BONUS = 500;
+const SCORE_TIME_BONUS_PER_S = 25;
+// Seconds allowed before the time bonus is exhausted. A clean run of the
+// street takes ~3 minutes, so this rewards finishing without grinding.
+const SCORE_PAR_SECONDS = 240;
+
 const FURY_MAX = 100;
 // Meter gained per event, as a percentage of FURY_MAX. Flat: every hit
 // landed or taken is worth the same, so the meter fills at a steady,
@@ -107,6 +124,11 @@ const FURY_ACTIVE_FRAMES = 20 * 60; // 20 seconds at 60fps
 const FURY_DAMAGE_MULTIPLIER = 2;
 // Transformed, incoming damage is divided by this -- doubled defence.
 const FURY_DEFENCE_MULTIPLIER = 2;
+// SuperGere covers ground twice as fast as Gere. Applied to the run only,
+// not the walk or the dodge: FURY should feel like a sprint you can cross
+// the street with, while precise positioning stays as controllable as it
+// is normally.
+const FURY_RUN_MULTIPLIER = 2;
 const PLAYER_FURY_CHARACTER = 'supergere';
 // Only this character transforms. Everyone else has no FURY mechanic.
 const FURY_CHARACTER = 'gere';
@@ -234,6 +256,72 @@ const ENEMY_PUNISH_REACH_BONUS = 74;
 // fall clip is 25 frames; this paces it so the body actually drops rather
 // than snapping to the ground.
 const MINION_DEATH_FRAMES = 42;
+
+// --- Boss tuning -------------------------------------------------------
+//
+// The boss used to run on the plain minion AI: one punch clip, a minion's
+// walk speed and a minion's cooldowns. Against a player who can roll it
+// amounted to a slow man shuffling forward and jabbing once every 78
+// ticks, which is not a boss fight. It now has its own numbers.
+
+// The boss closes ground rather than strolling. Below CHARGE_RANGE it
+// walks; beyond it, it breaks into a run to get back on top of the player,
+// which is what stops rolling away from being a free reset.
+const BOSS_WALK_SPEED = 1.15;
+const BOSS_RUN_SPEED = 2.6;
+const BOSS_CHARGE_RANGE = 320;
+// The run clip cycles quicker than the walk, in proportion to how much more
+// ground it covers -- otherwise the boss appears to skate.
+const BOSS_RUN_CYCLE_FRAMES = 52;
+// The lunging smash plays longer than an ordinary swing: it is the boss's
+// most committed move and its recovery is the fight's main opening.
+const BOSS_HEAVY_FRAMES = 30;
+const BOSS_HEAVY_STRIKE_TICK = 15;
+// Pause after a whole flurry -- roughly a third of a minion's, so the
+// pressure is relentless rather than politely taking turns.
+const BOSS_ATTACK_COOLDOWN = 26;
+// A shorter square-up than a minion's 14: still readable, still duckable,
+// but it does not hand over a free punish every single swing.
+const BOSS_WINDUP_FRAMES = 10;
+// The boss does not mill about waiting its turn with the crowd.
+const BOSS_HESITATION = 0;
+// It reads rolls far more often than a minion does.
+const BOSS_ROLL_PUNISH_CHANCE = 0.85;
+// Its attack patterns. Three real clips (punch/kick/heavy) rather than the
+// single punch it had, each with its own reach and damage, so the fight
+// has a rhythm you can learn to read.
+const BOSS_PATTERNS = [
+  // Fast double jab into a kick: the bread-and-butter pressure string.
+  [
+    { clip: 'attack', damage: 7, reach: 132 },
+    { clip: 'attack', damage: 7, reach: 132 },
+    { clip: 'kick', damage: 11, reach: 142 },
+  ],
+  // A committed lunging smash: biggest damage, longest reach, and the
+  // longest recovery, so it is the opening to punish.
+  [
+    { clip: 'heavy', damage: 16, reach: 186 },
+  ],
+  // Kick-heavy closer, for when it has you cornered.
+  [
+    { clip: 'kick', damage: 11, reach: 142 },
+    { clip: 'heavy', damage: 16, reach: 186 },
+  ],
+];
+// The boss commits to a swing from further out than a minion, matching its
+// longer reach -- otherwise it would walk inside its own heavy every time.
+const BOSS_ATTACK_COMMIT_RANGE = 172;
+const BOSS_PREFERRED_GAP = 110;
+
+// Phase shift. Every BOSS_PHASE_HITS blows landed, the boss goes
+// untouchable for BOSS_PHASE_FRAMES ticks -- it still moves and still
+// hits, so the window is spent evading rather than trading. The counter
+// resets when the window opens, so it is "5 more hits" each time.
+const BOSS_PHASE_HITS = 5;
+const BOSS_PHASE_FRAMES = 180; // 3 seconds at 60fps
+// It presses the advantage while it cannot be hurt: no cooldown to speak
+// of and no wind-up hesitation.
+const BOSS_PHASE_COOLDOWN = 12;
 const GERE_WALK_CYCLE_FRAMES = 140;
 
 // jump_right's frames are uncropped 256x256 tiles with the character's
@@ -319,6 +407,18 @@ class Player {
     this.respawnTimer = 0;
     // Set once every life is spent; the level reads it to end the run.
     this.gameOver = false;
+    // Running score, and the combo that multiplies it. Kills inside
+    // COMBO_WINDOW frames of each other chain: the Nth kill in a chain is
+    // worth N times the enemy's base value, which is what makes clearing a
+    // pack without pausing worth more than picking them off one at a time.
+    this.score = 0;
+    this.combo = 0;
+    this.comboTimer = 0;
+    // Best combo reached over the run, kept for the end-of-level summary.
+    this.bestCombo = 0;
+    // One-frame edge carrying the points just scored, so the level can
+    // float a "+250" where the enemy fell without polling the score.
+    this.scoreEvent = null;
     // One-frame edge the level turns into a popup: 'exhausted' as he goes
     // down, 'comeback' as he returns, 'gameOver' on the last life.
     this.deathEvent = null;
@@ -337,6 +437,9 @@ class Player {
     // spriteCharacter itself is swapped to supergere while transformed.
     this.baseSpriteCharacter = spriteCharacter;
     this.fury = 0;
+    // Permanent damage scaling earned from boss drops. 1 until a
+    // 'boost_atk' pickup raises it; see attackMultiplier().
+    this.atkMultiplier = 1;
     this.furyTimer = 0;
     this.furyActive = false;
     // Set for one frame when the transformation starts/ends, so the HUD can
@@ -674,7 +777,9 @@ class Player {
         if (input.held.up) dy--;
         if (input.held.down) dy++;
 
-        const speed = input.held.run ? PLAYER_RUN_SPEED : PLAYER_MOVE_SPEED;
+        const speed = input.held.run
+          ? PLAYER_RUN_SPEED * (this.furyActive ? FURY_RUN_MULTIPLIER : 1)
+          : PLAYER_MOVE_SPEED;
         this.x += dx * speed;
         // Dodging (up/down within the fight lane) is always fast, independent
         // of Shift/run — a beat-em-up player needs to sidestep attacks reliably.
@@ -705,6 +810,8 @@ class Player {
     }
 
     if (this.invuln > 0) this.invuln--;
+    // The kill chain lapses on its own; addScore() restarts it.
+    if (this.comboTimer > 0 && --this.comboTimer === 0) this.combo = 0;
 
     if (this.action !== this.prevAction) {
       this.animTimer = 0;
@@ -736,8 +843,43 @@ class Player {
 
   // Damage scaling currently in force. Transformed Gere hits far harder;
   // everyone else is always at 1x.
+  // Called at the start of a level. Health comes back full and the FURY
+  // meter is emptied, so a level always opens from a known state rather
+  // than inheriting however the last one ended.
+  //
+  // Permanent progress -- lives, and the max-health/attack boosts earned
+  // from bosses -- deliberately survives this: those are the run's
+  // rewards, and wiping them at every level boundary would make beating a
+  // boss worth nothing past the level it happened on.
+  startLevel() {
+    this.hp = this.maxHp;
+    this.fury = 0;
+    if (this.furyActive) this.endFury();
+    this.furyTimer = 0;
+    // The score deliberately survives this: startLevel() is called on
+    // entering a level, and a run's score accumulates across it rather
+    // than resetting with the health bar. A fresh run gets a fresh Player.
+  }
+
+  // Banks the points for one downed enemy and extends the kill chain.
+  // Returns the points actually awarded (base x multiplier), which is what
+  // the level floats above the body.
+  addScore(base) {
+    this.combo = Math.min(this.combo + 1, SCORE_COMBO_MAX);
+    this.comboTimer = SCORE_COMBO_WINDOW;
+    if (this.combo > this.bestCombo) this.bestCombo = this.combo;
+    const points = (base | 0) * this.combo;
+    this.score += points;
+    this.scoreEvent = points;
+    return points;
+  }
+
   attackMultiplier() {
-    return this.furyActive ? FURY_DAMAGE_MULTIPLIER : 1;
+    // Boss attack boosts stack multiplicatively with FURY, so a boosted
+    // transformation is stronger than either alone. Everything the player
+    // throws goes through attackBox(), so scaling here covers every move.
+    const fury = this.furyActive ? FURY_DAMAGE_MULTIPLIER : 1;
+    return fury * this.atkMultiplier;
   }
 
   // Attack reach and box size, in pixels, measured from the player's centre
@@ -931,14 +1073,74 @@ const EnemyTypes = {
       ko: { key: 'fall', loop: false, holdFrames: MINION_DEATH_FRAMES },
     },
   },
-  boss1: {
-    hp: 250, speed: 0.55, damage: 16, contactRange: 56, color: { suit: '#0f5f2e', accent: '#ffffff', skin: Palette.skin, hair: '#1a1a1a' },
-    scoreValue: 2000, boss: true, name: 'The Hooded Villain',
-    spriteCharacter: 'boss1',
+  // A second street minion. Same role as `minion` -- it arrives in the same
+  // packs and dies the same way -- but it is the tougher, slower half of the
+  // pair: more HP and a harder hit, traded against speed, so a mixed pack
+  // has two rhythms in it rather than one enemy repeated. Worth more
+  // accordingly.
+  bananana: {
+    blastOnDeath: true,
+    hp: 40,
+    speed: 0.55,
+    damage: 5,
+    contactRange: 50,
+    color: { suit: '#e8c53a', accent: '#3a6ea8', skin: '#f0d34a', hair: '#7a5c1e' },
+    scoreValue: 150,
+    spriteCharacter: 'bananana',
+    // The pack has no dedicated 'heavy' folder, so attack/kick are its two
+    // patterns -- Enemy picks between them (see the minion's two-pattern
+    // comment); pointing 'heavy' at a missing clip would leave it frozen.
     spriteAnimMap: {
       idle: { key: 'idle_right', loop: false, holdFrames: 1 },
       walk: { key: 'walk_right', loop: true, cycleFrames: ENEMY_WALK_CYCLE_FRAMES },
       attack: { key: 'punch', loop: false, holdFrames: ENEMY_ATTACK_FRAMES },
+      kick: { key: 'kick', loop: false, holdFrames: ENEMY_ATTACK_FRAMES },
+      hurt: { key: 'hurt', loop: false, holdFrames: HIT_STUN_FRAMES },
+      ko: { key: 'fall', loop: false, holdFrames: MINION_DEATH_FRAMES },
+    },
+    name: 'Bananana',
+  },
+  boss1: {
+    // 170 rather than 250: the phase shift means the boss can only be hurt
+    // for roughly a third of the fight, so the old pool -- set when every
+    // blow counted -- stretched the encounter past fifty seconds of mostly
+    // waiting for the shield to drop. Lowering it keeps the fight long
+    // without making it a war of attrition.
+    hp: 170, speed: BOSS_WALK_SPEED, damage: 16, contactRange: 56, color: { suit: '#0f5f2e', accent: '#ffffff', skin: Palette.skin, hair: '#1a1a1a' },
+    scoreValue: 2000, boss: true, name: 'The Hooded Villain',
+    // Rolls the boss table instead of the street one: always a payout, and
+    // one that upgrades the run rather than topping up a health bar.
+    bossLoot: true,
+    spriteCharacter: 'boss1',
+    // Its own aggression numbers rather than the shared minion ones. The
+    // AI reads these through the boss* accessors on Enemy, so a second
+    // boss type only has to state its values here.
+    runSpeed: BOSS_RUN_SPEED,
+    chargeRange: BOSS_CHARGE_RANGE,
+    attackCooldown: BOSS_ATTACK_COOLDOWN,
+    windupFrames: BOSS_WINDUP_FRAMES,
+    hesitation: BOSS_HESITATION,
+    rollPunishChance: BOSS_ROLL_PUNISH_CHANCE,
+    patterns: BOSS_PATTERNS,
+    commitRange: BOSS_ATTACK_COMMIT_RANGE,
+    preferredGap: BOSS_PREFERRED_GAP,
+    // Goes untouchable for a spell every few blows landed; see
+    // Enemy.takeDamage and the phase handling in update().
+    phaseHits: BOSS_PHASE_HITS,
+    phaseFrames: BOSS_PHASE_FRAMES,
+    phaseCooldown: BOSS_PHASE_COOLDOWN,
+    // The boss art has walk/run/punch/kick/heavy/fall clips; only punch and
+    // walk were ever mapped, so two of its three attacks and its entire run
+    // were sitting unused on disk while it shuffled about throwing jabs.
+    spriteAnimMap: {
+      idle: { key: 'idle_right', loop: false, holdFrames: 1 },
+      walk: { key: 'walk_right', loop: true, cycleFrames: ENEMY_WALK_CYCLE_FRAMES },
+      // The run cycles faster than the walk: it is covering more ground per
+      // tick, so playing it at walk pace would read as a moonwalk.
+      run: { key: 'run_right', loop: true, cycleFrames: BOSS_RUN_CYCLE_FRAMES },
+      attack: { key: 'punch', loop: false, holdFrames: ENEMY_ATTACK_FRAMES },
+      kick: { key: 'kick', loop: false, holdFrames: ENEMY_ATTACK_FRAMES },
+      heavy: { key: 'heavy', loop: false, holdFrames: BOSS_HEAVY_FRAMES },
       hurt: { key: 'idle_right', loop: false, holdFrames: 1 },
       // 'ko' (this.dead) plays the fall/collapse clip once and holds the
       // last frame, matching how deathTimer already gates the KO duration.
@@ -987,9 +1189,15 @@ class Enemy {
     // it does not think, move, attack or take hits, so it cannot be killed
     // before it has finished appearing.
     this.spawnTimer = 0;
-    // Rolled at the moment of death: null, 'health' or 'fury'. The level
-    // spawns the pickup.
+    // Rolled at the moment of death: null, or a LOOT_TABLE kind (see
+    // rollLoot/rollBossLoot in sprites.js). The level spawns the pickup.
+    // dropSpawned latches once it has, so a body that lies on the street
+    // for a while pays out exactly one pickup rather than one per frame.
     this.dropsPotion = null;
+    this.dropSpawned = false;
+    // Latched the same way, for the same reason: points are paid once per
+    // body, not once per frame it lies there.
+    this.scoreCounted = false;
     this.dead = false;
     this.deathTimer = 0;
     this.flashTimer = 0;
@@ -1012,6 +1220,57 @@ class Enemy {
     this.lastHitZone = null;
     // Live debris bursts. Cosmetic only; retired once their frames expire.
     this.bursts = [];
+    // Boss phase shift: blows landed since the last window, and how long
+    // the current untouchable window has left. While phaseTimer runs the
+    // boss cannot be damaged but attacks freely -- see takeDamage() and
+    // the phase block in update().
+    this.hitsTaken = 0;
+    this.phaseTimer = 0;
+  }
+
+  // --- Per-type tuning ---------------------------------------------------
+  // Enemies share one AI; the numbers it runs on come from the type. Each
+  // of these falls back to the shared minion value, so only a type that
+  // wants to differ (the boss) has to say so.
+  attackCooldownFrames() {
+    if (this.phaseTimer > 0 && this.def.phaseCooldown != null) {
+      return this.def.phaseCooldown;
+    }
+    return this.def.attackCooldown != null
+      ? this.def.attackCooldown : ENEMY_ATTACK_COOLDOWN;
+  }
+
+  windupFrames() {
+    return this.def.windupFrames != null
+      ? this.def.windupFrames : ENEMY_WINDUP_FRAMES;
+  }
+
+  // Rolled fresh each time an enemy backs off, so a group does not all
+  // lunge on the same frame. A boss has none: it never waits its turn.
+  rollHesitation() {
+    const max = this.def.hesitation != null
+      ? this.def.hesitation : ENEMY_APPROACH_HESITATION;
+    return Math.random() * max;
+  }
+
+  rollPunishChance() {
+    return this.def.rollPunishChance != null
+      ? this.def.rollPunishChance : ENEMY_ROLL_PUNISH_CHANCE;
+  }
+
+  commitRange() {
+    return this.def.commitRange != null
+      ? this.def.commitRange : ENEMY_ATTACK_COMMIT_RANGE;
+  }
+
+  preferredGap() {
+    return this.def.preferredGap != null
+      ? this.def.preferredGap : ENEMY_PREFERRED_GAP;
+  }
+
+  // True while the boss is mid-phase-shift: untouchable, but still fighting.
+  isPhasing() {
+    return this.phaseTimer > 0;
   }
 
   // bounds: same world-space {left, right, top, bottom} contract as Player.update.
@@ -1060,6 +1319,9 @@ class Enemy {
     }
 
     if (this.flashTimer > 0) this.flashTimer--;
+    // The untouchable window runs down whatever else the boss is doing --
+    // it is a timer on its invulnerability, not a state it stands still in.
+    if (this.phaseTimer > 0) this.phaseTimer--;
 
     // Materialising: stand inert until the arrival effect finishes.
     if (this.spawnTimer > 0) {
@@ -1098,7 +1360,7 @@ class Enemy {
     if (this.isAttacking()) {
       this.attackTimer--;
       const strikeAt = this.punishing
-        ? ENEMY_PUNISH_STRIKE_TICK : ENEMY_ATTACK_STRIKE_TICK;
+        ? ENEMY_PUNISH_STRIKE_TICK : this.blowStrikeTick();
       if (!this.attackLanded && this.animTimer >= strikeAt) {
         this.attackLanded = true;
         // A punish reaches further than a jab, which is what lets it catch
@@ -1115,7 +1377,7 @@ class Enemy {
         this.punishing = false;
         this.comboLeft--;
         this.patternStep++;
-        if (this.comboLeft > 0 && dist <= ENEMY_ATTACK_COMMIT_RANGE) {
+        if (this.comboLeft > 0 && dist <= this.commitRange()) {
           // Still swinging: brief gap, then the next blow of the flurry.
           this.action = 'idle';
           this.comboGap = ENEMY_COMBO_GAP;
@@ -1123,8 +1385,8 @@ class Enemy {
           // Flurry over (or the player got away) -- back off and reset.
           this.action = 'idle';
           this.comboLeft = 0;
-          this.attackCooldown = ENEMY_ATTACK_COOLDOWN;
-          this.hesitation = Math.random() * ENEMY_APPROACH_HESITATION;
+          this.attackCooldown = this.attackCooldownFrames();
+          this.hesitation = this.rollHesitation();
         }
       }
       this.tickAnimTimer();
@@ -1140,7 +1402,7 @@ class Enemy {
     if (this.windup > 0) {
       this.windup--;
       this.action = 'idle';
-      if (dist > ENEMY_ATTACK_COMMIT_RANGE + 40) {
+      if (dist > this.commitRange() + 40) {
         this.windup = 0;
       } else if (this.windup === 0) {
         this.startPattern();
@@ -1161,7 +1423,7 @@ class Enemy {
         && this.attackCooldown <= 0 && this.hasAttackClip()
         && dist <= ENEMY_ROLL_PUNISH_RANGE) {
       this.sawRoll = true;
-      if (Math.random() < ENEMY_ROLL_PUNISH_CHANCE) {
+      if (Math.random() < this.rollPunishChance()) {
         this.action = 'attack';
         this.punishing = true;
         this.attackTimer = ENEMY_PUNISH_FRAMES;
@@ -1178,7 +1440,7 @@ class Enemy {
       // Mid-flurry: hold position and throw the next blow the moment the
       // gap elapses, so the burst stays tight.
       if (this.comboGap === 0 && this.comboLeft > 0
-          && dist <= ENEMY_ATTACK_COMMIT_RANGE) {
+          && dist <= this.commitRange()) {
         this.throwBlow();
       } else {
         this.action = 'idle';
@@ -1189,20 +1451,24 @@ class Enemy {
 
     if (this.hesitation > 0) this.hesitation--;
 
-    if (dist > ENEMY_ATTACK_COMMIT_RANGE) {
-      const speed = this.def.speed;
+    if (dist > this.commitRange()) {
+      // Closing the gap. A type with a run (the boss) sprints the long
+      // stretches and drops to a walk once it is nearly in range, so
+      // retreating buys distance for a moment rather than for the round.
+      const charging = this.canRun() && dist > this.def.chargeRange;
+      const speed = charging ? this.def.runSpeed : this.def.speed;
       this.x += (dx / dist) * speed;
       this.y += (dy / dist) * speed;
-      this.action = 'walk';
-      this.walkPhase += 0.28;
+      this.action = charging ? 'run' : 'walk';
+      this.walkPhase += charging ? 0.5 : 0.28;
     } else if (this.attackCooldown <= 0 && this.hasAttackClip()
         && this.hesitation <= 0) {
       // In range: square up first. The swing starts when the wind-up
       // elapses, which is what makes the attack readable rather than
       // landing the instant they arrive.
-      this.windup = ENEMY_WINDUP_FRAMES;
+      this.windup = this.windupFrames();
       this.action = 'idle';
-    } else if (dist > ENEMY_PREFERRED_GAP) {
+    } else if (dist > this.preferredGap()) {
       // In swinging range but on cooldown: keep closing, so they press you
       // instead of hovering at the edge of their reach.
       const speed = this.def.speed * 0.6;
@@ -1228,23 +1494,59 @@ class Enemy {
     return loaded && loaded[ko.key] ? ko.holdFrames : 0;
   }
 
-  // Picks an attack pattern and throws its first blow. Half the time a
-  // punch-punch-kick combo, half a single heavy smash.
+  // Whether this type sprints to close long gaps, and has the art to show
+  // it. A type without a run clip simply walks the whole way in.
+  canRun() {
+    return !!(this.def.runSpeed && this.def.chargeRange && this.hasClip('run'));
+  }
+
+  // Picks an attack pattern and throws its first blow.
+  //
+  // A type carrying its own `patterns` list (the boss) picks evenly among
+  // them, skipping any whose art is missing. Everything else keeps the
+  // original coin-flip between the punch-punch-kick combo and the single
+  // heavy smash.
   startPattern() {
-    const smash = Math.random() < ENEMY_SMASH_CHANCE
-      && this.hasClip(ENEMY_PATTERN_SMASH[0].clip);
-    this.pattern = smash ? ENEMY_PATTERN_SMASH : ENEMY_PATTERN_COMBO;
+    if (this.def.patterns) {
+      const usable = this.def.patterns.filter(
+        (pattern) => pattern.every((blow) => this.hasClip(blow.clip)),
+      );
+      // If no full pattern has art behind it, fall back to a lone punch
+      // rather than swinging clips that would not draw.
+      this.pattern = usable.length
+        ? usable[Math.floor(Math.random() * usable.length)]
+        : [{ clip: 'attack', damage: this.def.damage, reach: ENEMY_STRIKE_REACH }];
+    } else {
+      const smash = Math.random() < ENEMY_SMASH_CHANCE
+        && this.hasClip(ENEMY_PATTERN_SMASH[0].clip);
+      this.pattern = smash ? ENEMY_PATTERN_SMASH : ENEMY_PATTERN_COMBO;
+    }
     this.patternStep = 0;
     this.comboLeft = this.pattern.length;
     this.throwBlow();
   }
 
-  // Starts the clip for the blow at the current step.
+  // Starts the clip for the blow at the current step. A heavy plays longer
+  // than a jab, so the clip length is taken from the blow rather than being
+  // one flat number for every swing.
   throwBlow() {
     const blow = this.currentBlow();
     this.action = blow && this.hasClip(blow.clip) ? blow.clip : 'attack';
-    this.attackTimer = ENEMY_ATTACK_FRAMES;
+    this.attackTimer = this.blowFrames();
     this.attackLanded = false;
+  }
+
+  // How long the blow being thrown plays for, and how far into it contact
+  // is made. The heavy is the slow, committed one -- longer wind-up, later
+  // contact, longer recovery -- which is what makes it punishable.
+  blowFrames() {
+    return this.action === 'heavy' && this.def.patterns
+      ? BOSS_HEAVY_FRAMES : ENEMY_ATTACK_FRAMES;
+  }
+
+  blowStrikeTick() {
+    return this.action === 'heavy' && this.def.patterns
+      ? BOSS_HEAVY_STRIKE_TICK : ENEMY_ATTACK_STRIKE_TICK;
   }
 
   // True while any attack clip is playing, whichever the pattern chose.
@@ -1318,6 +1620,25 @@ class Enemy {
     if (this.dead) return;
     // Untouchable until it has finished appearing.
     if (this.spawnTimer > 0) return;
+    // Mid-phase-shift: the blow passes straight through. The boss is not
+    // stunned and not slowed by it either -- it keeps coming, which is the
+    // point of the window.
+    if (this.isPhasing()) return;
+    // Every few blows landed the boss shifts out of reach for a spell.
+    // Counted here, on hits taken rather than on damage, so a heavy and a
+    // jab move it along equally and the window is predictable to play
+    // around: five connections, then three seconds of evasion.
+    if (this.def.phaseHits) {
+      this.hitsTaken++;
+      if (this.hitsTaken >= this.def.phaseHits) {
+        this.hitsTaken = 0;
+        this.phaseTimer = this.def.phaseFrames;
+        // Cancel any recovery it was sitting in so the window opens with
+        // the boss already on the attack rather than idling through it.
+        this.attackCooldown = 0;
+        this.hesitation = 0;
+      }
+    }
     this.hp -= amount;
     // The sack absorbs hits without flinching into a hurt clip; it swings
     // away from the blow instead, scaled by how hard the hit was.
@@ -1371,19 +1692,13 @@ class Enemy {
       this.action = 'ko';
       this.deathTimer = 0;
       // Roll for a drop once, here, rather than when the body is cleared:
-      // the result must not change if the death is re-evaluated. The rare
-      // fury potion is checked first so its 5% is flat, not a slice of the
-      // health potion's chance.
-      // One roll over a single 0..1 range, so each chance is exact rather
-      // than being conditioned on the other's failure.
-      const roll = Math.random();
-      if (roll < FURY_POTION_DROP_CHANCE) {
-        this.dropsPotion = 'fury';
-      } else if (roll < FURY_POTION_DROP_CHANCE + POTION_DROP_CHANCE) {
-        this.dropsPotion = 'health';
-      } else {
-        this.dropsPotion = null;
-      }
+      // the result must not change if the death is re-evaluated. The odds
+      // and effects live in LOOT_TABLE (see sprites.js).
+      //
+      // A boss rolls its own, better table: beating one is a milestone, so
+      // it always leaves something worth having rather than possibly
+      // nothing at all.
+      this.dropsPotion = this.def.bossLoot ? rollBossLoot() : rollLoot();
     }
   }
 
@@ -1391,6 +1706,13 @@ class Enemy {
     this.dead = false;
     this.deathTimer = 0;
     this.hp = this.maxHp;
+    // A revived enemy (the arena's training dummy) may drop -- and be
+    // scored -- again.
+    this.dropsPotion = null;
+    this.dropSpawned = false;
+    this.scoreCounted = false;
+    this.hitsTaken = 0;
+    this.phaseTimer = 0;
     this.hitStun = 0;
     this.flashTimer = 0;
     this.action = 'idle';
@@ -1538,6 +1860,15 @@ class Enemy {
     ctx.save();
     if (this.flashTimer > 0) {
       ctx.filter = 'brightness(2)';
+    }
+    // Untouchable window: the boss phases in and out rather than simply
+    // eating hits with no feedback. Without this a player who lands the
+    // fifth blow just sees their attacks stop working for no visible
+    // reason, which reads as a bug rather than a mechanic.
+    if (this.isPhasing()) {
+      const pulse = 0.32 + 0.26 * Math.sin(this.phaseTimer * 0.35);
+      ctx.globalAlpha = pulse;
+      ctx.filter = 'brightness(1.6) saturate(0.2)';
     }
     if (this.def.inert) {
       // A knocked-down prop sags toward the ground until it pops back up.
@@ -1718,8 +2049,9 @@ function resolvePlayerAttacks(player, enemies) {
 
 // A health pickup left behind by a defeated enemy. Walk over it to drink.
 class Potion {
-  // kind: 'health' restores a slice of health, 'fury' fills the meter.
-  constructor(x, y, kind = 'health') {
+  // kind is a LOOT_TABLE entry's kind: one of the three health bottles,
+  // 'fury' (fills the meter) or 'heart' (an extra life).
+  constructor(x, y, kind = 'health_small') {
     this.x = x;
     this.y = y;
     this.kind = kind;
@@ -1743,12 +2075,45 @@ class Potion {
       player.startFury();
       return true;
     }
-    // Only worth picking up if it would actually heal something.
+    if (this.kind === 'boost_hp') {
+      // Permanent vitality: the ceiling rises and the same amount is
+      // granted straight away, so the reward is felt on pickup rather than
+      // only being noticed at the next healing bottle.
+      this.taken = true;
+      player.maxHp += BOSS_HP_BOOST;
+      player.hp = clamp(player.hp + BOSS_HP_BOOST, 0, player.maxHp);
+      return true;
+    }
+    if (this.kind === 'boost_atk') {
+      // Permanent power: every blow the player throws is scaled by this
+      // for the rest of the run (see Player.attackScale()).
+      this.taken = true;
+      player.atkMultiplier *= BOSS_ATK_BOOST;
+      return true;
+    }
+    if (this.kind === 'heart') {
+      // An extra life, or a recovered one. Already at full hearts, it
+      // raises the ceiling; below it, it fills a lost pip back in. Either
+      // way it is always worth taking, so unlike the bottles it is never
+      // left on the ground.
+      this.taken = true;
+      if (player.lives >= player.maxLives) {
+        player.maxLives++;
+        player.lives++;
+      } else {
+        player.lives++;
+      }
+      return true;
+    }
+    // A bottle is drunk on contact whenever it would heal something, and
+    // otherwise simply left where it lies. Bottles are never destroyed or
+    // timed out: one you walk past at full health stays on the street, so
+    // you can come back for it once you have taken damage.
     if (player.hp >= player.maxHp) return false;
+    const entry = LOOT_BY_KIND[this.kind];
+    const heal = entry && entry.heal ? entry.heal : 0.10;
     this.taken = true;
-    player.hp = clamp(
-      player.hp + player.maxHp * POTION_HEAL_FRACTION, 0, player.maxHp,
-    );
+    player.hp = clamp(player.hp + player.maxHp * heal, 0, player.maxHp);
     return true;
   }
 

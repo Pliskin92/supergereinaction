@@ -1,6 +1,9 @@
 <!doctype html>
 <html lang="en">
 <head>
+<!-- The page itself must not be cached, or a stale copy keeps
+     pointing at old ?v= script URLs and the fix never arrives. -->
+<meta http-equiv="Cache-Control" content="no-cache, must-revalidate" />
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <base href="/" />
@@ -42,18 +45,20 @@
   <!-- Options are filled in from the Stages table in js/stages.js. -->
   <select id="stageSelect"></select>
 </div>
-<p class="hint">
-  WASD/Arrows move · J punch · K roll · L heavy · Space jump ·
-  <strong>R</strong> reset sack · <strong>F</strong> force FURY
-</p>
+<!-- Filled in from the string table once i18n.js has loaded. -->
+<p class="hint" id="controlsHint"></p>
 <canvas id="arenaCanvas" width="960" height="480"></canvas>
 
-<script src="js/i18n.js"></script>
-<script src="js/sprites.js"></script>
-<script src="js/assets.js"></script>
-<script src="js/entities.js"></script>
-<script src="js/stages.js"></script>
-<script src="js/fury-hud.js"></script>
-<script src="js/char-arena.js"></script>
+<script src="js/i18n.js?v=11"></script>
+<script src="js/sprites.js?v=11"></script>
+<script src="js/assets.js?v=11"></script>
+<script src="js/entities.js?v=11"></script>
+<script src="js/stages.js?v=11"></script>
+<script src="js/fury-hud.js?v=11"></script>
+<script src="js/char-arena.js?v=11"></script>
+<script>
+  document.getElementById('controlsHint').textContent =
+    `${t('controls')} \u00b7 ${t('resetSack')}`;
+</script>
 </body>
 </html>

@@ -1,6 +1,9 @@
 <!doctype html>
 <html lang="it">
 <head>
+<!-- The page itself must not be cached, or a stale copy keeps
+     pointing at old ?v= script URLs and the fix never arrives. -->
+<meta http-equiv="Cache-Control" content="no-cache, must-revalidate" />
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Super Gere: Parise Rescue</title>
@@ -33,10 +36,10 @@
 
 <canvas id="titleCanvas" width="480" height="270"></canvas>
 
-<script src="js/i18n.js"></script>
-<script src="js/highscores.js"></script>
-<script src="js/title.js"></script>
-<script src="js/game.js"></script>
+<script src="js/i18n.js?v=11"></script>
+<script src="js/highscores.js?v=11"></script>
+<script src="js/title.js?v=11"></script>
+<script src="js/game.js?v=11"></script>
 
 </body>
 </html>

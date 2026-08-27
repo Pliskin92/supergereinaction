@@ -1,6 +1,9 @@
 <!doctype html>
 <html lang="en">
 <head>
+<!-- The page itself must not be cached, or a stale copy keeps
+     pointing at old ?v= script URLs and the fix never arrives. -->
+<meta http-equiv="Cache-Control" content="no-cache, must-revalidate" />
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <base href="/" />
@@ -19,19 +22,26 @@
 </style>
 </head>
 <body>
-<p class="hint">
-  WASD/Arrows walk · <strong>Shift</strong> run · Space jump ·
-  J punch · K roll · L heavy · <strong>ESC</strong> back
-</p>
+<!-- Filled in from the string table once i18n.js has loaded, so the
+     controls line follows the chosen language like the rest of the UI. -->
+<p class="hint" id="controlsHint"></p>
 <!-- Height matches lv1-background.png's aspect at 960 wide, so the strip
      draws at 1:1 rather than being scaled down. -->
 <canvas id="levelCanvas" width="960" height="387"></canvas>
 
-<script src="js/i18n.js"></script>
-<script src="js/sprites.js"></script>
-<script src="js/assets.js"></script>
-<script src="js/entities.js"></script>
-<script src="js/fury-hud.js"></script>
-<script src="js/level.js"></script>
+<script src="js/i18n.js?v=11"></script>
+<script src="js/sprites.js?v=11"></script>
+<script src="js/assets.js?v=11"></script>
+<script src="js/entities.js?v=11"></script>
+<script src="js/fury-hud.js?v=11"></script>
+<!-- The level records a score at the end of the run, so it needs the
+     highscore table the title screen reads. -->
+<script src="js/highscores.js?v=11"></script>
+<!-- Opening cutscene; draws with sprites.js helpers, so it loads after it. -->
+<script src="js/intro.js?v=11"></script>
+<script src="js/level.js?v=11"></script>
+<script>
+  document.getElementById('controlsHint').textContent = `${t('controls')} \u00b7 ESC`;
+</script>
 </body>
 </html>

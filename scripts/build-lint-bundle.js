@@ -18,7 +18,7 @@ const bundles = {
   // web/level/index.html
   'bundle-level.js': [
     'i18n.js', 'sprites.js', 'assets.js', 'entities.js',
-    'fury-hud.js', 'level.js',
+    'fury-hud.js', 'highscores.js', 'intro.js', 'level.js',
   ],
   'bundle-arena.js': [
     'i18n.js', 'sprites.js', 'assets.js', 'entities.js',

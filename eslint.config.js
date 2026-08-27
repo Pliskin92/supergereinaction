@@ -15,6 +15,7 @@ module.exports = [
         Promise: 'readonly',
         fetch: 'readonly',
         localStorage: 'readonly',
+        sessionStorage: 'readonly',
         Proxy: 'readonly',
         JSON: 'readonly',
       },

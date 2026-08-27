@@ -212,7 +212,7 @@ class TitleMenu {
     ctx.font = '10px monospace';
     const rows = [
       [t('language'), Languages[Settings.lang]],
-      [t('difficulty'), `${Difficulties[Settings.difficulty].label} (${difficultyLives()}\u2665)`],
+      [t('difficulty'), `${difficultyLabel()} (${difficultyLives()}\u2665)`],
     ];
     rows.forEach(([label, value], i) => {
       const selected = i === this.optionIndex;
