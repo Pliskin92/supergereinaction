@@ -14,8 +14,16 @@
 name: Publish image
 
 on:
+  # EVERY branch, not just main. The package has to exist before it can be
+  # made public or deployed anywhere, and waiting for a merge to create it
+  # blocks both. Branch builds are tagged by branch name; only main moves
+  # `latest` (see the tag rules below), so a work-in-progress branch can
+  # never overwrite the release tag.
   push:
-    branches: [main]
+    branches: ['**']
+    # Docs-only pushes do not change the image, so they do not rebuild it.
+    paths-ignore:
+      - '**.md'
   # Lets a release be re-cut without an empty commit.
   workflow_dispatch:
 
@@ -57,10 +65,12 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ steps.name.outputs.image }}
-          # `latest` for the newest main, plus the commit sha so a specific
-          # build can always be pulled back.
+          # `latest` tracks main ONLY -- a branch build must never replace
+          # the tag people deploy. Every build also gets its branch name and
+          # its commit sha, so a specific one can always be pulled back.
           tags: |
-            type=raw,value=latest
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=ref,event=branch
             type=sha,format=long
 
       - name: Build and push
