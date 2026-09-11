@@ -11,7 +11,22 @@ const TitleScreen = {
   OPTIONS: 'options',
 };
 
+// The base menu. CONTINUE is inserted ahead of it when a run is in
+// progress, so the entry is only ever shown when it does something.
 const MENU_ITEMS = ['newGame', 'arena', 'highscores', 'options'];
+
+// True when a run was left part-played in this tab. Guarded so the title
+// screen still works if campaign.js is not loaded (it is, but the menu
+// should not be the thing that breaks if that ever changes).
+function hasRunInProgress() {
+  if (typeof loadRun !== 'function') return false;
+  try {
+    const run = loadRun();
+    return run.level > 0 && run.level < CAMPAIGN_LENGTH;
+  } catch (e) {
+    return false;
+  }
+}
 // Rows on the Options screen, in display order.
 const OPTION_ROWS = ['language', 'difficulty'];
 
@@ -30,6 +45,16 @@ function navigateToArena() {
 }
 
 function navigateToNewGame() {
+  // NEW GAME means level 1 with a clean slate. A run left in session
+  // storage by an abandoned playthrough would otherwise drop the player
+  // straight back into level 4 with that run's score.
+  if (typeof clearRun === 'function') clearRun();
+  window.location.href = NEW_GAME_URL;
+}
+
+// CONTINUE picks the stored run back up wherever it was left. The menu only
+// offers it when there is one to resume (see TitleMenu.items).
+function navigateToContinue() {
   window.location.href = NEW_GAME_URL;
 }
 
@@ -41,6 +66,11 @@ class TitleMenu {
     this.optionIndex = 0;
     this.index = 0;
     this.tick = 0;
+    // Resolved once at construction: whether a run is resumable cannot
+    // change while the title screen is up.
+    this.items = hasRunInProgress()
+      ? ['continue', ...MENU_ITEMS]
+      : [...MENU_ITEMS];
   }
 
   // Arrow keys move the cursor, Enter selects, Escape backs out. Called
@@ -50,8 +80,8 @@ class TitleMenu {
     this.tick = 0;
 
     if (this.screen === TitleScreen.MENU) {
-      if (key === 'ArrowUp') this.index = (this.index + MENU_ITEMS.length - 1) % MENU_ITEMS.length;
-      else if (key === 'ArrowDown') this.index = (this.index + 1) % MENU_ITEMS.length;
+      if (key === 'ArrowUp') this.index = (this.index + this.items.length - 1) % this.items.length;
+      else if (key === 'ArrowDown') this.index = (this.index + 1) % this.items.length;
       else if (key === 'Enter') this.select();
       return;
     }
@@ -80,11 +110,12 @@ class TitleMenu {
   }
 
   select() {
-    const item = MENU_ITEMS[this.index];
+    const item = this.items[this.index];
     // New Game and Arena are standalone pages with their own loops and
     // script sets, so selecting either is a navigation, not a state change.
     if (item === 'arena') { navigateToArena(); return; }
     if (item === 'newGame') { navigateToNewGame(); return; }
+    if (item === 'continue') { navigateToContinue(); return; }
     if (item === 'highscores') this.screen = TitleScreen.SCORES;
     else if (item === 'options') this.screen = TitleScreen.OPTIONS;
   }
@@ -147,7 +178,7 @@ class TitleMenu {
   drawMenu(ctx) {
     const { W, H } = this;
     const top = H * 0.52;
-    MENU_ITEMS.forEach((item, i) => {
+    this.items.forEach((item, i) => {
       const selected = i === this.index;
       const y = top + i * 22;
       if (selected) {

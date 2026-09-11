@@ -18,6 +18,8 @@ module.exports = [
         sessionStorage: 'readonly',
         Proxy: 'readonly',
         JSON: 'readonly',
+        URLSearchParams: 'readonly',
+        Number: 'readonly',
       },
     },
     rules: {

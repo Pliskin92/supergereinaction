@@ -1,4 +1,11 @@
-// Level 1: a scrolling street you can walk along.
+// A story level: a scrolling street you can walk along.
+//
+// This page plays WHICHEVER level the run is on, not level 1 specifically.
+// Everything that differs between the six -- backdrop, walkable band, world
+// length, roster, pack sizes, boss, who is rescued -- is a row in the
+// Campaign table (js/campaign.js), read once into `level` below. What is
+// left here is the part that is the same for every level: the camera, the
+// encounter pacing, the HUD and the end-of-level flow.
 //
 // This is the side-scrolling counterpart to the free-play arena. The arena
 // is one fixed screen (it draws every actor at cameraX 0); here the world is
@@ -15,6 +22,19 @@ ctx.imageSmoothingEnabled = false;
 const W = canvas.width;
 const H = canvas.height;
 
+// ---- Which level this page is playing ----
+// The run says which; ?level= overrides it, so a level can be opened
+// directly for testing without playing the campaign up to it. The run is
+// the source of truth in normal play.
+const run = loadRun();
+const levelIndex = (() => {
+  const param = new URLSearchParams(window.location.search).get('level');
+  // ?level=1 is the FIRST level to a player; the table is 0-based.
+  if (param !== null && param !== '') return clampIndex(Number(param) - 1);
+  return clampIndex(run.level);
+})();
+const level = campaignLevel(levelIndex);
+
 // How many times the background strip repeats end to end. The art loops, so
 // the level is simply the strip laid down this many times; walking off the
 // last copy is what ends the level once there is somewhere to go.
@@ -24,7 +44,7 @@ const H = canvas.height;
 // somewhere to happen and no further; density is then set by the spacing
 // below rather than by stretching a fixed roster over whatever length the
 // loop count happened to produce.
-const LEVEL_LOOPS = 6;
+const LEVEL_LOOPS = level.loops;
 
 // Enemy layout. Minions arrive in locked encounters rather than trickling
 // in: walk far enough and a group teleports in ON SCREEN, the street locks,
@@ -63,14 +83,14 @@ const LEVEL_ENCOUNTER_JITTER = 0.25;
 // minion, rolled per spawn. Kept a minority on level 1: it is the tougher
 // of the two, so it reads as the occasional harder body in a pack rather
 // than the default one. Later levels can raise this.
-const LEVEL_BANANANA_SHARE = 0.3;
+const LEVEL_BANANANA_SHARE = level.toughShare;
 // Both street minion types. Which one a slot gets is a roll against the
 // share above; everything else about them is identical to the level (they
 // share the pack, the lock, and the score latch).
-const LEVEL_MINION_TYPES = { standard: 'minion', tough: 'bananana' };
+const LEVEL_MINION_TYPES = level.minions;
 
-const LEVEL_ENCOUNTER_SIZE_MIN = 4;
-const LEVEL_ENCOUNTER_SIZE_MAX = 6;
+const LEVEL_ENCOUNTER_SIZE_MIN = level.packs.min;
+const LEVEL_ENCOUNTER_SIZE_MAX = level.packs.max;
 // A cap rather than a quota. Encounters keep coming at the spacing above
 // for as long as there is street left, and this only stops them running
 // away with themselves -- it is set high enough that the spacing, not the
@@ -88,7 +108,7 @@ const LEVEL_ENCOUNTER_SIZE_MAX = 6;
 //
 // Randomised per run within +/- LEVEL_MINION_JITTER so two playthroughs are
 // not the identical sequence of packs. Later levels raise this.
-const LEVEL_MINION_TARGET = 60;
+const LEVEL_MINION_TARGET = level.roster;
 const LEVEL_MINION_JITTER = 6;
 // Rolled once at level setup; nextEncounterX() stops packs when it is spent.
 let levelMinionTotal = LEVEL_MINION_TARGET;
@@ -137,7 +157,7 @@ const LEVEL_BOSS_AT = 0.95;
 const ENEMY_ACTIVATE_RANGE = 900;
 
 // The street strip. Repeated LEVEL_LOOPS times to make the world.
-const LEVEL_BACKGROUND = 'assets/release/backgrounds/lv1/lv1-background.png';
+const LEVEL_BACKGROUND = level.background;
 
 // Remembers that the opening cutscene has played, for this tab only.
 const INTRO_SEEN_KEY = 'supergere.introSeen';
@@ -149,8 +169,8 @@ const INTRO_SEEN_KEY = 'supergere.introSeen';
 // kerb edge at y=283 to the front lip at y=351, past which is the basement
 // wall. Only the pavement is walkable -- the road above the kerb is
 // backdrop, not playfield.
-const LEVEL_WALK_TOP = 0.731;
-const LEVEL_WALK_BOTTOM = 0.907;
+const LEVEL_WALK_TOP = level.walk.top;
+const LEVEL_WALK_BOTTOM = level.walk.bottom;
 // Keep actors clear of both edges of that band, as the arena stages do.
 const LEVEL_EDGE_MARGIN = 0.18;
 
@@ -182,11 +202,29 @@ window.addEventListener('keydown', (e) => {
     e.preventDefault();
     return;
   }
+  // The card is dismissible but not interactive: Enter or Space cuts it
+  // short, Escape leaves, and nothing else reaches the player underneath.
+  //
+  // A finished run takes precedence over it. The card cannot normally be up
+  // at the same time as a game over -- nothing can hurt the player while it
+  // holds the world -- but if the two ever do coincide, the run's own
+  // prompt must be what Enter answers, rather than the key being eaten by a
+  // card the player is no longer looking at.
+  if (levelCard && !levelCard.done && !player.gameOver && !levelClear) {
+    if (e.key === 'Enter' || e.key === ' ') levelCard.skip();
+    else if (e.key === 'Escape') { clearRun(); window.location.href = '/index.html'; }
+    e.preventDefault();
+    return;
+  }
   if (levelClear) {
-    if (e.key === 'Escape') window.location.href = '/index.html';
+    // Escape abandons the run outright rather than leaving it half-played
+    // in storage for the next visit to resume into.
+    if (e.key === 'Escape') { clearRun(); window.location.href = '/index.html'; }
     else if (e.key === 'Enter') {
+      // A record still to be typed takes the first Enter to commit the
+      // name; the second carries on.
       if (!scoreSaved) commitScore();
-      else window.location.href = '/index.html';
+      else continueRun();
     } else if (!scoreSaved) {
       if (e.key === 'Backspace') nameEntry = nameEntry.slice(0, -1);
       // One printable character per press; anything longer is a named key
@@ -208,8 +246,13 @@ window.addEventListener('keydown', (e) => {
     // landing and taking hits. Forcing it is an arena-only convenience.
     // Root-relative: this page sets <base href="/">.
     if (e.key === 'Escape') window.location.href = '/index.html';
-    // Enter restarts the level once every life is spent.
-    if (e.key === 'Enter' && player.gameOver) window.location.reload();
+    // Enter restarts once every life is spent. The run is over, so it is
+    // cleared first: retrying starts a fresh campaign at level 1 rather
+    // than dropping back in at whatever level the spent run had reached.
+    if (e.key === 'Enter' && player.gameOver) {
+      clearRun();
+      window.location.href = '/level/index.html';
+    }
   }
   heldKeys.add(e.key);
   if ([' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) e.preventDefault();
@@ -267,6 +310,11 @@ let assetsReady = false;
 // on a replay within the same session (see levelSetUp) so retrying a run
 // does not mean sitting through it again.
 let intro = null;
+
+// The card that announces this level, shown once the assets are in and
+// after the cutscene (level 1) or straight away (levels 2-6). Null once it
+// has been dismissed. Like the cutscene it holds the world still while up.
+let levelCard = null;
 
 // Set once spawnEnemies() has placed the boss. Guards checkLevelClear from
 // firing during the frames before the level has been laid out.
@@ -351,6 +399,9 @@ function layoutLevel(img) {
   player.y = BOUNDS.bottom;
   // Full health, empty FURY. Boosts and lives earned earlier carry over.
   player.startLevel();
+  // Mid-campaign levels resume the run's score and surviving lives; level 1
+  // of a fresh run has nothing to restore and starts at the defaults.
+  if (levelIndex > 0) player.resumeRun(run);
   spawnEnemies();
 }
 
@@ -368,7 +419,7 @@ function spawnEnemies() {
     + Math.floor(Math.random() * (LEVEL_MINION_JITTER * 2 + 1)) - LEVEL_MINION_JITTER;
   nextEncounterAt = worldWidth * LEVEL_ENCOUNTER_FROM;
   const lane = BOUNDS.bottom - BOUNDS.top;
-  enemies.push(new Enemy('boss1', worldWidth * LEVEL_BOSS_AT, BOUNDS.top + lane * 0.5));
+  enemies.push(new Enemy(level.boss, worldWidth * LEVEL_BOSS_AT, BOUNDS.top + lane * 0.5));
   bossSpawned = true;
   // The clock starts with the level, not with the page load, so time spent
   // waiting for the background does not come out of the time bonus.
@@ -616,6 +667,17 @@ function update() {
     clearPressed();
     return;
   }
+  // The card holds the world exactly as the cutscene does: it ticks, the
+  // clock does not, and no input reaches the player. A finished run ends it
+  // early, for the same reason the key handler yields to one.
+  if (levelCard && !levelCard.done && (player.gameOver || levelClear)) {
+    levelCard.done = true;
+  }
+  if (levelCard && !levelCard.done) {
+    levelCard.update();
+    clearPressed();
+    return;
+  }
   // Once the level is won (or lost) the world stops: the summary is a
   // screen, not something to keep fighting behind.
   if (levelClear || player.gameOver) {
@@ -734,21 +796,55 @@ function checkLevelClear() {
   // Time bonus tapers to nothing at par; there is no penalty for going over.
   const timeBonus = Math.max(0, SCORE_PAR_SECONDS - seconds) * SCORE_TIME_BONUS_PER_S;
   const livesBonus = player.lives * SCORE_LIFE_BONUS;
-  const total = player.score + timeBonus + livesBonus;
+  // The lives bonus is only banked at the END of the run. Paying it out per
+  // level would pay for the same surviving lives up to six times over, and
+  // would mean dying late in a run scored better than never dying at all.
+  const total = player.score + timeBonus + (isFinalLevel() ? livesBonus : 0);
   player.score = total;
 
+  // Carry the run forward: the next level starts on this score, with the
+  // lives that survived this one, and remembers who has been rescued.
+  run.level = levelIndex + 1;
+  run.score = total;
+  run.lives = player.lives;
+  if (level.rescue && !run.rescued.includes(level.rescue)) run.rescued.push(level.rescue);
+  saveRun(run);
+
+  // Only the END of a run goes on the highscore table. A per-level entry
+  // would fill the table with partial runs of the same playthrough.
+  const finished = isFinalLevel();
   const scores = loadHighscores();
   // The table holds HIGHSCORE_MAX rows, so anything beating the last of a
   // full table -- or landing on a table with room left -- gets an entry.
-  const isRecord = total > 0
+  const isRecord = finished && total > 0
     && (scores.length < HIGHSCORE_MAX || total > scores[scores.length - 1].score);
 
-  levelClear = { seconds, timeBonus, livesBonus, total, isRecord };
+  levelClear = {
+    seconds, timeBonus, livesBonus, total, isRecord, finished,
+  };
   nameEntry = '';
   scoreSaved = false;
   // A run that does not make the table is simply not recorded; there is
   // nothing to type, so the summary goes straight to its continue prompt.
   if (!isRecord) scoreSaved = true;
+}
+
+// True when the level just beaten is the last in the campaign.
+function isFinalLevel() {
+  return levelIndex >= CAMPAIGN_LENGTH - 1;
+}
+
+// Where ENTER goes from the summary: on to the next level, or back to the
+// menu once the campaign is done. The run has already been advanced and
+// saved by checkLevelClear(), so the next page simply reads it.
+function continueRun() {
+  if (isFinalLevel()) {
+    clearRun();
+    window.location.href = '/index.html';
+    return;
+  }
+  // Same page, next level: the run says which, so no parameter is needed.
+  window.location.href = '/level/index.html';
 }
 
 // Commits the typed name to the local table. Latched so holding Enter
@@ -803,10 +899,17 @@ function drawHud() {
   // height, which the taller stack overflowed.
   const titleSize = Math.round(9 * HUD_SCALE);
   const heartSize = 11 * HUD_SCALE;
-  const furyCaption = player.canFury()
-    ? HUD_BAR_H + 4 + Math.max(7, Math.round(HUD_BAR_H * 0.95)) + 4
+  // The FURY block is the bar plus the caption drawFuryBar writes UNDER it.
+  // That caption is drawn with textBaseline 'middle' at y + h + labelSize,
+  // so its ink reaches half a line FURTHER down again -- which is what used
+  // to spill past the bottom of the backing plate. Mirroring the same
+  // arithmetic here (rather than guessing at a +4 pad) keeps the plate
+  // sized to what is actually drawn on it at any HUD_SCALE.
+  const furyLabelSize = Math.max(7, Math.round(HUD_BAR_H * 0.95));
+  const furyBlock = player.canFury()
+    ? 4 + HUD_BAR_H + furyLabelSize * 1.5
     : 0;
-  const stackH = titleSize + heartSize * 1.6 + HUD_BAR_H + furyCaption;
+  const stackH = titleSize + heartSize * 1.6 + HUD_BAR_H + furyBlock;
   const panelH = Math.max(HUD_FACE, stackH);
   ctx.fillStyle = 'rgba(8,6,14,0.42)';
   rr(ctx, faceX - 4, faceY - 4, HUD_FACE + HUD_GUTTER + HUD_BAR_W + 12, panelH + 8, 6);
@@ -818,7 +921,7 @@ function drawHud() {
   ctx.fillStyle = '#ffd54d';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'alphabetic';
-  ctx.fillText(t('level1Title'), colX, faceY + titleSize);
+  ctx.fillText(t(level.titleKey), colX, faceY + titleSize);
 
   // Lives, as hearts. One pip per life the run started with, so the count
   // reads against the chosen difficulty rather than a fixed five.
@@ -846,27 +949,41 @@ function drawHud() {
   // Score and combo, to the right of the panel. The score is the number
   // the player is playing for, so it gets the largest type in the HUD.
   const scoreSize = Math.round(13 * HUD_SCALE);
+  const labelSize = Math.round(8 * HUD_SCALE);
+  const scoreText = String(player.score);
+  const comboText = player.combo > 1 ? `${t('combo')} x${player.combo}` : '';
+
+  // A plate behind the score for the same reason the panel has one: over a
+  // bright patch of sky white-on-nothing is unreadable. It is measured off
+  // the widest line it has to cover rather than a fixed width, so a seven
+  // figure score and a long translated COMBO label both stay on it.
+  ctx.font = `bold ${scoreSize}px monospace`;
+  let scorePlateW = ctx.measureText(scoreText).width;
+  if (comboText) {
+    ctx.font = `bold ${scoreSize}px Impact, "Arial Black", sans-serif`;
+    scorePlateW = Math.max(scorePlateW, ctx.measureText(comboText).width);
+  }
+  const scorePlateH = scoreSize + labelSize + (comboText ? scoreSize + 8 : 0) + 10;
+  ctx.fillStyle = 'rgba(8,6,14,0.42)';
+  rr(ctx, W - HUD_PAD - scorePlateW - 8, faceY - 4, scorePlateW + 12, scorePlateH, 6);
+  ctx.fill();
+
   ctx.textAlign = 'right';
   ctx.font = `bold ${scoreSize}px monospace`;
   ctx.lineJoin = 'round';
   ctx.lineWidth = 3;
   ctx.strokeStyle = '#1a1020';
-  const scoreText = String(player.score);
   ctx.strokeText(scoreText, W - HUD_PAD, faceY + scoreSize);
   ctx.fillStyle = '#ffffff';
   ctx.fillText(scoreText, W - HUD_PAD, faceY + scoreSize);
-  const labelSize = Math.round(8 * HUD_SCALE);
   ctx.font = `bold ${labelSize}px monospace`;
   ctx.fillStyle = 'rgba(255,255,255,0.55)';
   ctx.fillText(t('score'), W - HUD_PAD, faceY + scoreSize + labelSize + 2);
   // The live chain, shown only while it is running.
-  if (player.combo > 1) {
+  if (comboText) {
     ctx.font = `bold ${scoreSize}px Impact, "Arial Black", sans-serif`;
     ctx.fillStyle = '#ffd54d';
-    ctx.fillText(
-      `${t('combo')} x${player.combo}`,
-      W - HUD_PAD, faceY + scoreSize + labelSize * 2 + 8,
-    );
+    ctx.fillText(comboText, W - HUD_PAD, faceY + scoreSize + labelSize * 2 + 8);
   }
   ctx.textAlign = 'left';
 
@@ -941,26 +1058,44 @@ function drawLoading() {
 // The end-of-run summary: the score breakdown, and the name field when the
 // run earned a place on the table.
 function drawLevelClear() {
-  const { seconds, timeBonus, livesBonus, total, isRecord } = levelClear;
+  const {
+    seconds, timeBonus, livesBonus, total, isRecord, finished,
+  } = levelClear;
   ctx.save();
   ctx.fillStyle = 'rgba(10,8,14,0.82)';
   ctx.fillRect(0, 0, W, H);
   ctx.textAlign = 'center';
   ctx.lineJoin = 'round';
 
+  // The last level of the campaign gets its own heading: finishing the run
+  // is a different event from clearing one more street.
+  const heading = finished ? t('campaignClear') : t('levelClear');
   ctx.font = 'bold 34px Impact, "Arial Black", sans-serif';
   ctx.lineWidth = 7;
   ctx.strokeStyle = '#1a1020';
-  ctx.strokeText(t('levelClear'), W / 2, 54);
+  ctx.strokeText(heading, W / 2, 54);
   ctx.fillStyle = '#ffd54d';
-  ctx.fillText(t('levelClear'), W / 2, 54);
+  ctx.fillText(heading, W / 2, 54);
+
+  // Who was pulled out of this level, named under the heading -- the story
+  // reason the street was fought down in the first place.
+  if (level.rescue) {
+    ctx.font = 'bold 13px Impact, "Arial Black", sans-serif';
+    ctx.fillStyle = '#00f5d4';
+    ctx.fillText(`${t('rescued')}: ${t('rescue_' + level.rescue)}`, W / 2, 76);
+  }
 
   // The breakdown, laid out as label/value columns so the numbers line up.
   const mins = String(Math.floor(seconds / 60)).padStart(2, '0');
   const secs = String(seconds % 60).padStart(2, '0');
   const rows = [
     [t('timeBonus'), `${mins}:${secs}   +${timeBonus}`],
-    [`${t('livesBonus')} (${player.lives}\u2665)`, `+${livesBonus}`],
+    // The lives bonus is only banked at the end of the run, so mid-campaign
+    // the row reports the lives still in hand rather than a payout that has
+    // not happened.
+    finished
+      ? [`${t('livesBonus')} (${player.lives}\u2665)`, `+${livesBonus}`]
+      : [t('livesLeft'), `${player.lives}\u2665`],
     [`${t('combo')} MAX`, `x${player.bestCombo}`],
   ];
   ctx.font = 'bold 13px monospace';
@@ -977,7 +1112,11 @@ function drawLevelClear() {
   ctx.textAlign = 'center';
   ctx.font = 'bold 20px Impact, "Arial Black", sans-serif';
   ctx.fillStyle = '#00f5d4';
-  ctx.fillText(`${t('finalScore')}  ${total}`, W / 2, 180);
+  // Mid-campaign this is the running total, not the final one -- calling it
+  // FINAL SCORE on level 2 of 6 reads as the run having ended.
+  ctx.fillText(
+    `${finished ? t('finalScore') : t('runScore')}  ${total}`, W / 2, 180,
+  );
 
   if (isRecord && !scoreSaved) {
     ctx.font = 'bold 14px Impact, "Arial Black", sans-serif';
@@ -994,7 +1133,15 @@ function drawLevelClear() {
   } else {
     ctx.font = '11px monospace';
     ctx.fillStyle = 'rgba(255,255,255,0.65)';
-    ctx.fillText(t('continueHint'), W / 2, 232);
+    // Mid-campaign, the prompt says where Enter actually goes.
+    const hint = finished
+      ? t('continueHint')
+      : `${t('nextLevel')}: ${t(campaignLevel(levelIndex + 1).titleKey)}`;
+    ctx.fillText(hint, W / 2, 232);
+    if (!finished) {
+      ctx.fillStyle = 'rgba(255,255,255,0.45)';
+      ctx.fillText(t('continueHint'), W / 2, 250);
+    }
   }
   ctx.restore();
 }
@@ -1069,6 +1216,9 @@ function draw() {
   ctx.restore();
   drawHud();
   furyPopup.draw(ctx, W, H);
+  // Over the top of the world, so its closing fade dissolves into the
+  // level already running underneath rather than cutting to it.
+  if (levelCard && !levelCard.done) levelCard.draw(ctx);
   if (levelClear) drawLevelClear();
   else if (player.gameOver) drawGameOver();
 }
@@ -1089,6 +1239,8 @@ function levelSetUp() {
     // The cutscene's still backdrop. Gated like everything else so the
     // intro never draws a frame with its background missing.
     loadIntroBackgrounds(),
+    // The level's own splash art for the card, when its row declares any.
+    loadLevelCardArt(level),
     loadImage(LEVEL_BACKGROUND).then((img) => {
       if (!img) return;
       background = img;
@@ -1100,12 +1252,22 @@ function levelSetUp() {
     assetsReady = true;
     // The cutscene plays once per session. Retrying after a game over
     // reloads the page, so this is remembered outside it.
-    let seen = false;
-    try { seen = sessionStorage.getItem(INTRO_SEEN_KEY) === '1'; } catch (e) { /* storage blocked */ }
-    if (!seen) {
-      intro = new IntroScene(W, H);
-      try { sessionStorage.setItem(INTRO_SEEN_KEY, '1'); } catch (e) { /* session-only */ }
+    // The opening cutscene is level 1's -- it is how the run starts, so it
+    // does not play in front of levels 2-6. Within level 1 it is still
+    // remembered for the tab, so retrying after a game over does not mean
+    // sitting through it again.
+    if (levelIndex === 0) {
+      let seen = false;
+      try { seen = sessionStorage.getItem(INTRO_SEEN_KEY) === '1'; } catch (e) { /* storage blocked */ }
+      if (!seen) {
+        intro = new IntroScene(W, H);
+        try { sessionStorage.setItem(INTRO_SEEN_KEY, '1'); } catch (e) { /* session-only */ }
+      }
     }
+    // Every level gets a card, cutscene or not. It is created here rather
+    // than when the cutscene ends because update() simply waits for the
+    // cutscene to be done before ticking it.
+    levelCard = new LevelCard(W, H, level, levelIndex + 1);
   });
 }
 

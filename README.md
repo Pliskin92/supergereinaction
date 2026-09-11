@@ -49,6 +49,29 @@ docker run -p 8080:80 super-gere
 | **Confirm / Buy in Shop** | Enter |
 | **Leave Shop** | Escape |
 
+## Campaign
+
+**New Game** starts a six-level run. The score, the lives you have left and
+the family you have rescued carry from one level to the next; the run is
+remembered for the browser tab, so **Continue** appears on the title screen
+while one is part-played. Only finishing the whole run writes to the
+highscore table — a run abandoned partway is not recorded.
+
+Levels are described by a single table, `web/js/campaign.js`: backdrop,
+walkable band, length, roster, pack sizes, boss and who is rescued. Adding
+a level is a row there, not another copy of `level.js`.
+
+Levels 2-6 are fully playable but still borrow level 1's street art, and
+share its boss. See [ART-TODO.md](ART-TODO.md) for what is missing and how
+to drop it in — every slot has a working fallback, so art can be added one
+piece at a time.
+
+To jump straight to a level while testing:
+
+```
+/level/index.html?level=4
+```
+
 ## Story & Levels
 
 1. **Grandma Carla's Street** — Battle through robotic minions down a progressively advancing street toward Grandma's flower-covered house

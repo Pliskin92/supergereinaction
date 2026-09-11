@@ -13,12 +13,12 @@ const OUT_DIR = path.join(__dirname, '..', '.lint-bundle');
 // Each list must stay in sync with the <script> tags in its page.
 const bundles = {
   // web/index.html — the title screen only; no gameplay modules.
-  'bundle.js': ['i18n.js', 'highscores.js', 'title.js', 'game.js'],
+  'bundle.js': ['i18n.js', 'highscores.js', 'campaign.js', 'title.js', 'game.js'],
   // web/arena/index.html
   // web/level/index.html
   'bundle-level.js': [
     'i18n.js', 'sprites.js', 'assets.js', 'entities.js',
-    'fury-hud.js', 'highscores.js', 'intro.js', 'level.js',
+    'fury-hud.js', 'highscores.js', 'campaign.js', 'intro.js', 'level-card.js', 'level.js',
   ],
   'bundle-arena.js': [
     'i18n.js', 'sprites.js', 'assets.js', 'entities.js',

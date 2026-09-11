@@ -861,6 +861,20 @@ class Player {
     // than resetting with the health bar. A fresh run gets a fresh Player.
   }
 
+  // Restores a run in progress onto a freshly constructed Player.
+  //
+  // Each level is its own page load, so the Player that fought level 1 is
+  // gone by the time level 2 starts. The run (see js/campaign.js) carries
+  // the score and the lives across that boundary, and this is where they
+  // are put back. maxLives stays the difficulty's count so the HUD still
+  // draws the full row of hearts with the lost ones greyed out.
+  resumeRun(runState) {
+    if (!runState) return;
+    this.score = Number(runState.score) || 0;
+    const lives = Number(runState.lives);
+    if (Number.isFinite(lives) && lives > 0) this.lives = Math.min(lives, this.maxLives);
+  }
+
   // Banks the points for one downed enemy and extends the kill chain.
   // Returns the points actually awarded (base x multiplier), which is what
   // the level floats above the body.

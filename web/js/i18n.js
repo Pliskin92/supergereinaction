@@ -12,6 +12,7 @@ const Languages = {
 const Strings = {
   en: {
     newGame: 'NEW GAME',
+    continue: 'CONTINUE',
     arena: 'ARENA',
     highscores: 'HIGHSCORES',
     options: 'OPTIONS',
@@ -71,9 +72,33 @@ const Strings = {
     introVillain: 'MR. MEEOTTEE',
     introGere: 'GERE',
     levelStart: 'LEVEL 1 - START!',
+    // ---- Campaign ----
+    // The remaining five story levels. level1Title is above, with the
+    // strings that existed when the street was the whole game.
+    level2Title: "LEVEL 2 \u2014 GASTONE'S GARAGE",
+    level3Title: "LEVEL 3 \u2014 MATTIA'S WORKSHOP",
+    level4Title: "LEVEL 4 \u2014 MICHELE'S YARD",
+    level5Title: 'LEVEL 5 \u2014 BOSS LUIGI',
+    level6Title: 'LEVEL 6 \u2014 THE FINAL RESCUE',
+    campaignClear: 'RESCUE COMPLETE!',
+    runScore: 'SCORE SO FAR',
+    level: 'LEVEL',
+    rescueGoal: 'RESCUE',
+    cardSkip: 'ENTER TO START',
+    nextLevel: 'NEXT',
+    rescued: 'RESCUED',
+    livesLeft: 'LIVES LEFT',
+    // Who each level saves. Keyed rescue_<id> so the summary looks one up
+    // straight from the campaign row's `rescue` field.
+    rescue_carla: 'GRANDMA CARLA',
+    rescue_gastone: 'GRANDPA GASTONE',
+    rescue_mattia: 'UNCLE MATTIA',
+    rescue_michele: 'UNCLE MICHELE',
+    rescue_family: 'THE WHOLE FAMILY',
   },
   it: {
     newGame: 'NUOVA PARTITA',
+    continue: 'CONTINUA',
     arena: 'ARENA',
     highscores: 'PUNTEGGI',
     options: 'OPZIONI',
@@ -127,6 +152,25 @@ const Strings = {
     introVillain: 'MR. MEEOTTEE',
     introGere: 'GERE',
     levelStart: 'LIVELLO 1 - VIA!',
+    // ---- Campagna ----
+    level2Title: 'LIVELLO 2 \u2014 IL GARAGE DI GASTONE',
+    level3Title: 'LIVELLO 3 \u2014 IL LABORATORIO DI MATTIA',
+    level4Title: 'LIVELLO 4 \u2014 IL CORTILE DI MICHELE',
+    level5Title: 'LIVELLO 5 \u2014 BOSS LUIGI',
+    level6Title: 'LIVELLO 6 \u2014 IL SALVATAGGIO FINALE',
+    campaignClear: 'SALVATAGGIO COMPLETO!',
+    runScore: 'PUNTEGGIO PARZIALE',
+    level: 'LIVELLO',
+    rescueGoal: 'SALVA',
+    cardSkip: 'INVIO PER INIZIARE',
+    nextLevel: 'PROSSIMO',
+    rescued: 'SALVATO',
+    livesLeft: 'VITE RIMASTE',
+    rescue_carla: 'NONNA CARLA',
+    rescue_gastone: 'NONNO GASTONE',
+    rescue_mattia: 'ZIO MATTIA',
+    rescue_michele: 'ZIO MICHELE',
+    rescue_family: 'TUTTA LA FAMIGLIA',
   },
 };
 

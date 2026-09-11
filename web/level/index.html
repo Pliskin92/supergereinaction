@@ -37,8 +37,14 @@
 <!-- The level records a score at the end of the run, so it needs the
      highscore table the title screen reads. -->
 <script src="js/highscores.js?v=11"></script>
+<!-- The campaign table and the run that walks through it. level.js reads
+     which level to play from here, so it loads first. -->
+<script src="js/campaign.js?v=11"></script>
 <!-- Opening cutscene; draws with sprites.js helpers, so it loads after it. -->
 <script src="js/intro.js?v=11"></script>
+<!-- The per-level title card. Uses intro.js's drawCoverImage, so it
+     loads after it. -->
+<script src="js/level-card.js?v=11"></script>
 <script src="js/level.js?v=11"></script>
 <script>
   document.getElementById('controlsHint').textContent = `${t('controls')} \u00b7 ESC`;
