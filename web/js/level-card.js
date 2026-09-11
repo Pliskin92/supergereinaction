@@ -28,14 +28,27 @@ const LEVEL_CARD_FADE_FRAMES = 45;
 // gets an entry and the card draws its procedural treatment instead.
 const LevelCardArt = {};
 
-// Loads the splash art for one level, if its row declares any. Resolves
-// either way: missing art is a fallback, not a failure, so the level's
-// loading gate must not hang on it.
+// Loads the still art a level owns: the title-card splash, and the backdrop
+// for the shop that follows it. Both live in the same table, the shop's
+// keyed '<id>-shop', because they are the same kind of thing -- a full-frame
+// still drawn behind a panel -- and one table means one loader.
+//
+// Resolves either way: missing art is a fallback, not a failure, so the
+// level's loading gate must not hang on it.
 function loadLevelCardArt(levelDef) {
-  if (!levelDef || !levelDef.art) return Promise.resolve();
-  return loadImage(levelDef.art).then((img) => {
-    if (img) LevelCardArt[levelDef.id] = img;
-  });
+  if (!levelDef) return Promise.resolve();
+  const jobs = [];
+  if (levelDef.art) {
+    jobs.push(loadImage(levelDef.art).then((img) => {
+      if (img) LevelCardArt[levelDef.id] = img;
+    }));
+  }
+  if (levelDef.shopArt) {
+    jobs.push(loadImage(levelDef.shopArt).then((img) => {
+      if (img) LevelCardArt[`${levelDef.id}-shop`] = img;
+    }));
+  }
+  return Promise.all(jobs);
 }
 
 class LevelCard {

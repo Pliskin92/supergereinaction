@@ -20,6 +20,9 @@
 //   boss           the enemy type waiting at the end
 //   rescue         who is saved when the boss goes down -- the story beat
 //                  the level exists to deliver
+//   shopArt        OPTIONAL backdrop for the shop that opens after this
+//                  level. Absent means the shop draws a plain panel. The
+//                  final level has none -- it opens no shop.
 //   art            OPTIONAL splash shown behind the level's title card
 //                  (js/level-card.js). Absent means the card draws its own
 //                  speed-line treatment, so this can be filled in per level
@@ -43,6 +46,7 @@ const PLACEHOLDER_WALK = { top: 0.731, bottom: 0.907 };
 const Campaign = [
   {
     id: 'lv1',
+    shopArt: 'assets/release/shops/shop_grandma_kitchen.jpg',
     titleKey: 'level1Title',
     background: 'assets/release/backgrounds/lv1/lv1-background.png',
     walk: { top: 0.731, bottom: 0.907 },
@@ -60,6 +64,7 @@ const Campaign = [
   // over the street -- so the campaign already plays as a campaign.
   {
     id: 'lv2',
+    shopArt: 'assets/release/shops/shop_grandpa_garage.jpg',
     titleKey: 'level2Title',
     background: PLACEHOLDER_STREET,
     walk: PLACEHOLDER_WALK,
@@ -74,6 +79,7 @@ const Campaign = [
   },
   {
     id: 'lv3',
+    shopArt: 'assets/release/shops/shop_mattia_workshop.jpg',
     titleKey: 'level3Title',
     background: PLACEHOLDER_STREET,
     walk: PLACEHOLDER_WALK,
@@ -88,6 +94,7 @@ const Campaign = [
   },
   {
     id: 'lv4',
+    shopArt: 'assets/release/shops/shop_michele_yard.jpg',
     titleKey: 'level4Title',
     background: PLACEHOLDER_STREET,
     walk: PLACEHOLDER_WALK,
@@ -102,6 +109,7 @@ const Campaign = [
   },
   {
     id: 'lv5',
+    shopArt: 'assets/release/shops/shop_boss_luigi.jpg',
     titleKey: 'level5Title',
     background: PLACEHOLDER_STREET,
     walk: PLACEHOLDER_WALK,

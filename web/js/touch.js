@@ -94,7 +94,8 @@ function touchWantsKeys() {
   const state = globalOrNull('touchState');
   if (typeof state === 'function') {
     const s = state();
-    if (s.cutscene || s.card || s.interlude || s.shop || s.summary || s.gameOver) return true;
+    if (s.cutscene || s.card || s.interlude || s.shop || s.lock
+        || s.summary || s.gameOver) return true;
   }
   // The title screen has no Input object at all -- it is a menu, and menus
   // are always key-driven.

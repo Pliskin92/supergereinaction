@@ -132,6 +132,17 @@ Between levels a **shop** spends score on permanent upgrades — an extra
 life, +20 max HP, +15% damage. Points spent are gone from the final total,
 so it is a running choice between finishing and scoring.
 
+Beating the final boss does not end the run on its own: behind him is a
+locked door, and the game **prints a secret code** you are meant to write
+down. That is the end-game goal. The code is a single constant,
+`LOCK_CODE` in [web/js/lockcode.js](web/js/lockcode.js) — it ships as
+`0000`; change the digits and nothing else needs touching (any length
+works, and letters are fine).
+
+It is a keepsake, not a secret: this is a static browser game, so the code
+is in the shipped source and anyone can read it with devtools without
+playing. Do not use a code there that protects anything that matters.
+
 Each level ends with a short story scene — the rescue, and the hand-off to
 the next street — written in `web/js/interlude.js`. The dialogue is Italian
 in both languages, like the opening cutscene, because it is the family's

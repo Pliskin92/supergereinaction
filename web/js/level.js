@@ -235,6 +235,14 @@ window.addEventListener('keydown', (e) => {
     e.preventDefault();
     return;
   }
+  // The lock-code screen takes Enter/Space to move on. Escape is NOT bound
+  // to leaving the game here: the code is the reward for the whole run, and
+  // a reflexive Escape that skipped it would throw it away.
+  if (lockScreen && !lockScreen.done && (!interlude || interlude.done)) {
+    if (e.key === 'Enter' || e.key === ' ') lockScreen.dismiss();
+    e.preventDefault();
+    return;
+  }
   // The shop owns the keyboard while it is open: arrows pick a row, Enter
   // buys, Escape/Space leaves. Checked ahead of the summary for the same
   // reason the scene is -- levelClear is already set underneath it.
@@ -352,6 +360,10 @@ let intro = null;
 // hand-off to the next street. Runs BEFORE the summary -- the story beat
 // belongs to the fight that just ended, not to the score screen.
 let interlude = null;
+
+// The secret lock code, shown once the final boss is down. Null on every
+// level but the last: it is the prize for finishing the run.
+let lockScreen = null;
 
 // The shop, opened after the rescue scene and before the summary. Null on
 // the last level: there is no next street to prepare for, and points spent
@@ -736,6 +748,12 @@ function update() {
     clearPressed();
     return;
   }
+  // The lock code follows the final scene and holds the world the same way.
+  if (lockScreen && !lockScreen.done && (!interlude || interlude.done)) {
+    lockScreen.update();
+    clearPressed();
+    return;
+  }
   // The shop follows the rescue scene, and holds the world the same way.
   if (shop && !shop.done && (!interlude || interlude.done)) {
     shop.update();
@@ -898,8 +916,9 @@ function checkLevelClear() {
   const scene = new Interlude(W, H, level);
   if (!scene.done) interlude = scene;
   // The shop follows the scene. Not on the final level -- there is nothing
-  // left to buy anything for.
-  if (!isFinalLevel()) shop = new Shop(W, H, level, player, run);
+  // left to buy anything for; that level ends on the lock code instead.
+  if (isFinalLevel()) lockScreen = new LockCodeScreen(W, H);
+  else shop = new Shop(W, H, level, player, run);
   nameEntry = '';
   scoreSaved = false;
   // A run that does not make the table is simply not recorded; there is
@@ -1355,6 +1374,7 @@ function draw() {
   // While the rescue scene is playing it stands in for the summary; the
   // summary follows once it finishes or is skipped.
   if (interlude && !interlude.done) interlude.draw(ctx);
+  else if (lockScreen && !lockScreen.done) lockScreen.draw(ctx);
   else if (shop && !shop.done) shop.draw(ctx);
   else if (levelClear) drawLevelClear();
   else if (player.gameOver) drawGameOver();
@@ -1378,6 +1398,7 @@ window.touchState = () => ({
   // a synthetic Enter rather than as Input state.
   interlude: !!(interlude && !interlude.done),
   shop: !!(shop && !shop.done),
+  lock: !!(lockScreen && !lockScreen.done),
   summary: !!levelClear,
   gameOver: !!(player && player.gameOver),
 });

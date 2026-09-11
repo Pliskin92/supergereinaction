@@ -93,16 +93,11 @@ walk and punch. A pack at `web/assets/release/<name>_sprites/` with
 `idle_right`, `walk_right` and `punch` makes them appear as themselves — no
 code change, the lookup already tries those clips and falls back.
 
-## 6. Shop backdrops
+## 6. Shop backdrops — done
 
-You already have art for all five shops in `web/assets/private/`:
-`shop_grandma_kitchen.jpg`, `shop_grandpa_garage.jpg`,
-`shop_mattia_workshop.jpg`, `shop_michele_yard.jpg`, `shop_boss_luigi.jpg`.
-
-They are not shipped (`assets/private/` is excluded from the image). To use
-one, move it into `web/assets/release/shops/` and add `shopArt` to that
-level's campaign row. Without it the shop draws a plain dark panel, which
-works but is plain.
+All five shop backdrops are shipped (`web/assets/release/shops/`) and wired
+to their levels via `shopArt` in `web/js/campaign.js`. Nothing to do here
+unless you want to redraw them.
 
 ## 7. Rescue characters
 

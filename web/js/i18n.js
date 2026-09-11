@@ -98,6 +98,10 @@ const Strings = {
     rescue_michele: 'UNCLE MICHELE',
     rescue_family: 'THE WHOLE FAMILY',
     // ---- Shop and assists ----
+    // ---- The end-game lock code ----
+    lockTitle: 'THE DOOR IS LOCKED. THE CODE IS:',
+    lockWriteItDown: 'WRITE IT DOWN. YOU WILL NEED IT.',
+    lockContinue: 'ENTER TO CONTINUE',
     shopTitle: 'SHOP',
     shopLife: 'EXTRA LIFE',
     shopVitality: 'VITALITY  (+20 MAX HP)',
@@ -222,6 +226,10 @@ const Strings = {
     rescue_michele: 'ZIO MICHELE',
     rescue_family: 'TUTTA LA FAMIGLIA',
     // ---- Negozio e aiutanti ----
+    // ---- Il codice segreto finale ----
+    lockTitle: 'LA PORTA E CHIUSA. IL CODICE E:',
+    lockWriteItDown: 'SCRIVILO. TI SERVIRA.',
+    lockContinue: 'INVIO PER CONTINUARE',
     shopTitle: 'NEGOZIO',
     shopLife: 'VITA EXTRA',
     shopVitality: 'VITALITA  (+20 HP MAX)',
