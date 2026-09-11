@@ -49,7 +49,10 @@ docker run -p 8080:80 super-gere
 `.github/workflows/publish.yml` runs on every push to `main` and does two
 things:
 
-- **GitHub Pages** — deploys `web/` as the playable site. The source is
+- **GitHub Pages** — deploys `web/` as the playable site, minus
+  `web/assets/private/` (~200MB of working art, which is tracked in git and
+  would otherwise be published: Pages is public even from a private repo).
+  A guard fails the deploy if shipping code ever references that path. The source is
   written for a domain root (`<base href="/">` and absolute links), so the
   workflow rewrites those to the project subpath at deploy time. That is
   done in the workflow rather than in the source because the game navigates

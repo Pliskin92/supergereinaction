@@ -83,6 +83,30 @@ jobs:
             -e "s|\"/assets/|\"$BASE/assets/|g" \
             web/manifest.webmanifest
 
+      # Pages is PUBLIC even when the repo is private, so anything left in
+      # the uploaded directory is published to the open web. web/assets/
+      # private/ is ~200MB of working art -- source PSDs, concepts, unused
+      # sprite packs -- that is tracked in git and therefore present in the
+      # CI checkout. .dockerignore already keeps it out of the image; this
+      # is the same exclusion for Pages.
+      #
+      # Nothing shipping references it (only two comments mention the path),
+      # so removing it cannot break the site -- and the step below proves
+      # that rather than trusting it.
+      - name: Remove private working art
+        run: |
+          set -euo pipefail
+          rm -rf web/assets/private
+          # A reference from shipping code would now be a broken URL on a
+          # live public site, so fail the deploy instead of publishing one.
+          if grep -rn "assets/private" web --include='*.js' --include='*.html' \
+               --include='*.webmanifest' --include='*.css' \
+               | grep -v '^\s*//' | grep -v '^[^:]*:[0-9]*: *//' ; then
+            echo "::error::Shipping code references assets/private, which is not deployed."
+            exit 1
+          fi
+          echo "No shipping references to assets/private."
+
       # Jekyll would otherwise ignore any file or directory starting with an
       # underscore. None exist today, but a future sprite pack named that way
       # would vanish from the site with no error.
