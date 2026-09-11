@@ -178,6 +178,11 @@ const Input = {
   held: { left: false, right: false, up: false, down: false, run: false },
   pressed: { punch: false, slide: false, heavy: false, jump: false },
 };
+// Published deliberately for the touch pad (js/touch.js), which loads last
+// and writes into exactly this object so that a thumb and a keyboard reach
+// the player through one path. A top-level `const` is script-scoped and is
+// NOT a window property, so without this the pad cannot see it.
+window.Input = Input;
 
 const keyMap = {
   ArrowLeft: 'left', a: 'left', A: 'left',
@@ -1228,6 +1233,18 @@ function loop() {
   draw();
   requestAnimationFrame(loop);
 }
+
+// What the touch pad needs to know about the level's state: which of the
+// keyboard-driven screens, if any, is currently up. Published as a function
+// rather than the four globals themselves because these are reassigned as
+// the level runs -- a snapshot taken at load time would be permanently
+// stale. See js/touch.js.
+window.touchState = () => ({
+  cutscene: !!(intro && !intro.done),
+  card: !!(levelCard && !levelCard.done),
+  summary: !!levelClear,
+  gameOver: !!(player && player.gameOver),
+});
 
 function levelSetUp() {
   // The loop starts immediately so the loading screen animates, but

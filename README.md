@@ -49,6 +49,30 @@ docker run -p 8080:80 super-gere
 | **Confirm / Buy in Shop** | Enter |
 | **Leave Shop** | Escape |
 
+## Mobile
+
+The game plays on phones and tablets. Open the same URL in a mobile browser:
+an on-screen pad appears on touch devices, the canvas fills the screen, and
+in portrait the game asks to be turned (it is a wide side-scroller). Nothing
+changes on desktop — the pad is gated on `(pointer: coarse)`, so a narrow
+desktop window keeps its keyboard and its layout.
+
+It is also an installable PWA (`web/manifest.webmanifest`) — "Add to Home
+Screen" launches it fullscreen in landscape with no browser chrome.
+
+| Touch | Action |
+|---|---|
+| **D-pad** (bottom left) | Move |
+| **A** | Punch combo |
+| **B** | Roll |
+| **C** | Heavy attack |
+| **⇑** | Jump |
+| **☰** (bottom centre) | Back to menu |
+
+On menus, cutscenes and summaries the pad drives the existing keyboard
+handlers by dispatching synthetic key events, so those screens needed no
+touch-specific code (see `web/js/touch.js`).
+
 ## Campaign
 
 **New Game** starts a six-level run. The score, the lives you have left and

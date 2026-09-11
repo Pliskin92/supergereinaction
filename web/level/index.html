@@ -5,7 +5,7 @@
      pointing at old ?v= script URLs and the fix never arrives. -->
 <meta http-equiv="Cache-Control" content="no-cache, must-revalidate" />
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
 <base href="/" />
 <title>Super Gere — Livello 1</title>
 <style>
@@ -20,8 +20,26 @@
   .hint { font-size: 12px; color: #8a8aa8; margin: 0; }
   .hint strong { color: #ffd54d; }
 </style>
+<link rel="manifest" href="/manifest.webmanifest" />
+<!-- iOS ignores the manifest's display/orientation, so the equivalent
+     meta tags are needed for an installed home-screen launch there. -->
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="theme-color" content="#0d0c1d" />
+<!-- iOS uses this rather than the manifest icons. -->
+<link rel="apple-touch-icon" href="/assets/release/icons/icon-192.png" />
+<link rel="stylesheet" href="/css/mobile.css?v=12" />
 </head>
 <body>
+
+<!-- Shown only on a touch device held in portrait; see css/mobile.css. The
+     game is a wide side-scroller, so it asks to be turned rather than
+     squeezing itself into a strip. -->
+<div id="rotatePrompt">
+  <div class="rotate-icon">📱</div>
+  <strong id="rotateText"></strong>
+</div>
 <!-- Filled in from the string table once i18n.js has loaded, so the
      controls line follows the chosen language like the rest of the UI. -->
 <p class="hint" id="controlsHint"></p>
@@ -46,8 +64,15 @@
      loads after it. -->
 <script src="js/level-card.js?v=11"></script>
 <script src="js/level.js?v=11"></script>
+<!-- Touch controls. Builds the on-screen pad on coarse-pointer
+     devices and does nothing anywhere else. -->
+<script src="js/touch.js?v=12"></script>
 <script>
   document.getElementById('controlsHint').textContent = `${t('controls')} \u00b7 ESC`;
+  // The pad builds itself only on coarse-pointer devices; on desktop this
+  // is a no-op and the keyboard handlers are untouched.
+  setUpTouchControls();
+  document.getElementById('rotateText').textContent = t('rotateDevice');
 </script>
 </body>
 </html>

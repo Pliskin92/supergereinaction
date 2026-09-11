@@ -5,7 +5,7 @@
      pointing at old ?v= script URLs and the fix never arrives. -->
 <meta http-equiv="Cache-Control" content="no-cache, must-revalidate" />
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
 <base href="/" />
 <title>Super Gere — Arena</title>
 <style>
@@ -33,8 +33,26 @@
     padding: 6px 10px;
   }
 </style>
+<link rel="manifest" href="/manifest.webmanifest" />
+<!-- iOS ignores the manifest's display/orientation, so the equivalent
+     meta tags are needed for an installed home-screen launch there. -->
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="theme-color" content="#0d0c1d" />
+<!-- iOS uses this rather than the manifest icons. -->
+<link rel="apple-touch-icon" href="/assets/release/icons/icon-192.png" />
+<link rel="stylesheet" href="/css/mobile.css?v=12" />
 </head>
 <body>
+
+<!-- Shown only on a touch device held in portrait; see css/mobile.css. The
+     game is a wide side-scroller, so it asks to be turned rather than
+     squeezing itself into a strip. -->
+<div id="rotatePrompt">
+  <div class="rotate-icon">📱</div>
+  <strong id="rotateText"></strong>
+</div>
 <div class="pickers">
   <select id="characterSelect">
     <option value="gere">Gere</option>
@@ -56,9 +74,14 @@
 <script src="js/stages.js?v=11"></script>
 <script src="js/fury-hud.js?v=11"></script>
 <script src="js/char-arena.js?v=11"></script>
+<!-- Touch controls. Builds the on-screen pad on coarse-pointer
+     devices and does nothing anywhere else. -->
+<script src="js/touch.js?v=12"></script>
 <script>
   document.getElementById('controlsHint').textContent =
     `${t('controls')} \u00b7 ${t('resetSack')}`;
+  setUpTouchControls();
+  document.getElementById('rotateText').textContent = t('rotateDevice');
 </script>
 </body>
 </html>

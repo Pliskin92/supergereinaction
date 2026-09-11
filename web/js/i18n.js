@@ -85,6 +85,8 @@ const Strings = {
     level: 'LEVEL',
     rescueGoal: 'RESCUE',
     cardSkip: 'ENTER TO START',
+    // Shown over the game on a phone held upright.
+    rotateDevice: 'TURN YOUR DEVICE SIDEWAYS',
     nextLevel: 'NEXT',
     rescued: 'RESCUED',
     livesLeft: 'LIVES LEFT',
@@ -163,6 +165,7 @@ const Strings = {
     level: 'LIVELLO',
     rescueGoal: 'SALVA',
     cardSkip: 'INVIO PER INIZIARE',
+    rotateDevice: 'RUOTA IL DISPOSITIVO',
     nextLevel: 'PROSSIMO',
     rescued: 'SALVATO',
     livesLeft: 'VITE RIMASTE',
