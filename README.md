@@ -46,65 +46,25 @@ docker run -p 8080:80 super-gere
 
 ## Publishing
 
-`.github/workflows/publish.yml` runs on every push to `main` and does two
-things:
+`.github/workflows/publish.yml` builds and pushes the container image to
+**ghcr.io** on every push to `main`, for `linux/amd64` and `linux/arm64`,
+tagged `latest` and with the commit SHA. No secret to configure: it
+authenticates with the built-in `GITHUB_TOKEN`.
 
-- **GitHub Pages** — deploys `web/` as the playable site, minus
-  `web/assets/private/` (~200MB of working art, which is tracked in git and
-  would otherwise be published: Pages is public even from a private repo).
-  A guard fails the deploy if shipping code ever references that path. The source is
-  written for a domain root (`<base href="/">` and absolute links), so the
-  workflow rewrites those to the project subpath at deploy time. That is
-  done in the workflow rather than in the source because the game navigates
-  between directories at different depths, where relative paths that work
-  from one break from the other — and because the Docker image and
-  `python3 -m http.server` really are served from a root.
-- **ghcr.io** — builds and pushes the container image for `linux/amd64` and
-  `linux/arm64`, tagged `latest` and with the commit SHA.
+```bash
+docker run -p 8080:80 ghcr.io/pliskin92/supergereinaction:latest
+```
 
-Neither needs a secret: Pages uses OIDC and ghcr.io uses the built-in
-`GITHUB_TOKEN`.
+The package is private by default, matching the repo. To let others pull it
+without a token, open the package page on GitHub (*Packages* → this image →
+*Package settings*) and change its visibility to public.
 
-**One-time setup** — in the repo's *Settings → Pages*, set **Source** to
-**GitHub Actions**. Until that is done the Pages job fails; the image job is
-unaffected.
-
-## Controls
-
-| Action | Keys |
-|--------|------|
-| **Move** | Arrow Keys or WASD |
-| **Jump** | Space |
-| **Punch Combo (punch-punch-kick)** | J |
-| **Roll** | K |
-| **Heavy Attack** | L |
-| **Pause** | P |
-| **Confirm / Buy in Shop** | Enter |
-| **Leave Shop** | Escape |
-
-## Mobile
-
-The game plays on phones and tablets. Open the same URL in a mobile browser:
-an on-screen pad appears on touch devices, the canvas fills the screen, and
-in portrait the game asks to be turned (it is a wide side-scroller). Nothing
-changes on desktop — the pad is gated on `(pointer: coarse)`, so a narrow
-desktop window keeps its keyboard and its layout.
-
-It is also an installable PWA (`web/manifest.webmanifest`) — "Add to Home
-Screen" launches it fullscreen in landscape with no browser chrome.
-
-| Touch | Action |
-|---|---|
-| **D-pad** (bottom left) | Move |
-| **A** | Punch combo |
-| **B** | Roll |
-| **C** | Heavy attack |
-| **⇑** | Jump |
-| **☰** (bottom centre) | Back to menu |
-
-On menus, cutscenes and summaries the pad drives the existing keyboard
-handlers by dispatching synthetic key events, so those screens needed no
-touch-specific code (see `web/js/touch.js`).
+There is no GitHub Pages job: Pages on a private repo requires a paid plan.
+If a click-to-play URL is wanted later, any static host (Cloudflare Pages,
+Netlify) can serve `web/` — note the pages are written for a domain **root**
+(`<base href="/">` plus absolute links), so a host that serves from a
+subpath needs those rewritten, and `web/assets/private/` should be excluded
+from any public deploy.
 
 ## Campaign
 
