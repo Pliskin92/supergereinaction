@@ -78,6 +78,11 @@ Levels are described by a single table, `web/js/campaign.js`: backdrop,
 walkable band, length, roster, pack sizes, boss and who is rescued. Adding
 a level is a row there, not another copy of `level.js`.
 
+Each level ends with a short story scene — the rescue, and the hand-off to
+the next street — written in `web/js/interlude.js`. The dialogue is Italian
+in both languages, like the opening cutscene, because it is the family's
+voice rather than UI.
+
 Levels 2-6 are fully playable but still borrow level 1's street art, and
 share its boss. See [ART-TODO.md](ART-TODO.md) for what is missing and how
 to drop it in — every slot has a working fallback, so art can be added one

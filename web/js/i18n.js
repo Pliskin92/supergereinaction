@@ -97,6 +97,43 @@ const Strings = {
     rescue_mattia: 'UNCLE MATTIA',
     rescue_michele: 'UNCLE MICHELE',
     rescue_family: 'THE WHOLE FAMILY',
+    // ---- Interludes: the scene after each rescue ----
+    // Italian in BOTH languages, like the opening cutscene and for the same
+    // reason: the family is Italian and these are their voices, not UI. Only
+    // the chrome around them is translated.
+    //
+    // The arc across the six: Gere is told, one relative at a time, that
+    // Meeottee has been taking the town apart for longer than anyone said
+    // out loud -- and that his father knew. Each rescue points at the next
+    // door, so the run reads as one night rather than six errands.
+    //
+    // Level 1, Nonna Carla. The first one out, and the one who tells him
+    // this is bigger than his father.
+    ilCarla1: 'GERE! SAPEVO CHE SARESTI VENUTO TU.',
+    ilCarla2: 'NONNA, DOV E PAPA? DIMMI DOVE LO TENGONO!',
+    ilCarla3: 'NON SOLO LUI. HANNO PRESO TUTTI. COMINCIA DAL GARAGE.',
+    // Level 2, Nonno Gastone. The one who names the thing everyone avoided.
+    ilGastone1: 'CI HANNO MESSO UN ANNO, GERE. UN ANNO INTERO.',
+    ilGastone2: 'UN ANNO?! E NESSUNO MI HA DETTO NIENTE?',
+    ilGastone3: 'TUO PADRE NON VOLEVA. VA DA MATTIA, LUI HA LE PROVE.',
+    // Level 3, Zio Mattia. The proof, and the first real lead.
+    ilMattia1: 'HO TUTTO QUI. FIRME, MAPPE, I SUOI NOMI FALSI.',
+    ilMattia2: 'ALLORA LO INCHIODIAMO. DAMMI QUELLE CARTE.',
+    ilMattia3: 'NON BASTANO LE CARTE. MICHELE SA DOVE SI NASCONDE.',
+    // Level 4, Zio Michele. The address, and the warning.
+    ilMichele1: 'IL VECCHIO DEPOSITO, OLTRE IL PONTE. E LA.',
+    ilMichele2: 'ALLORA E FINITA. VADO A PRENDERMELO.',
+    ilMichele3: 'ATTENTO. LUIGI TIENE IL PONTE, E NON TI LASCIA PASSARE.',
+    // Level 5, Boss Luigi. Nobody is rescued -- Gere is alone on the bridge,
+    // and both lines are his.
+    ilLuigi1: 'IL PONTE E LIBERO. ALZATI, LUIGI, NON E COLPA TUA.',
+    ilLuigi2: 'MEEOTTEE. ULTIMA PORTA. ARRIVO.',
+    // Level 6, the end. Roger, on his feet, and the line that closes what
+    // the opening cutscene opened.
+    ilFinal1: 'FIGLIO MIO... SEI VENUTO DAVVERO.',
+    ilFinal2: 'TE L AVEVO DETTO, PAPA. STAVO ARRIVANDO.',
+    ilFinal3: 'SAN GIORGIO E NOSTRA. E STANOTTE TORNIAMO A CASA TUTTI.',
+
   },
   it: {
     newGame: 'NUOVA PARTITA',
@@ -174,6 +211,43 @@ const Strings = {
     rescue_mattia: 'ZIO MATTIA',
     rescue_michele: 'ZIO MICHELE',
     rescue_family: 'TUTTA LA FAMIGLIA',
+    // ---- Interludes: the scene after each rescue ----
+    // Italian in BOTH languages, like the opening cutscene and for the same
+    // reason: the family is Italian and these are their voices, not UI. Only
+    // the chrome around them is translated.
+    //
+    // The arc across the six: Gere is told, one relative at a time, that
+    // Meeottee has been taking the town apart for longer than anyone said
+    // out loud -- and that his father knew. Each rescue points at the next
+    // door, so the run reads as one night rather than six errands.
+    //
+    // Level 1, Nonna Carla. The first one out, and the one who tells him
+    // this is bigger than his father.
+    ilCarla1: 'GERE! SAPEVO CHE SARESTI VENUTO TU.',
+    ilCarla2: 'NONNA, DOV E PAPA? DIMMI DOVE LO TENGONO!',
+    ilCarla3: 'NON SOLO LUI. HANNO PRESO TUTTI. COMINCIA DAL GARAGE.',
+    // Level 2, Nonno Gastone. The one who names the thing everyone avoided.
+    ilGastone1: 'CI HANNO MESSO UN ANNO, GERE. UN ANNO INTERO.',
+    ilGastone2: 'UN ANNO?! E NESSUNO MI HA DETTO NIENTE?',
+    ilGastone3: 'TUO PADRE NON VOLEVA. VA DA MATTIA, LUI HA LE PROVE.',
+    // Level 3, Zio Mattia. The proof, and the first real lead.
+    ilMattia1: 'HO TUTTO QUI. FIRME, MAPPE, I SUOI NOMI FALSI.',
+    ilMattia2: 'ALLORA LO INCHIODIAMO. DAMMI QUELLE CARTE.',
+    ilMattia3: 'NON BASTANO LE CARTE. MICHELE SA DOVE SI NASCONDE.',
+    // Level 4, Zio Michele. The address, and the warning.
+    ilMichele1: 'IL VECCHIO DEPOSITO, OLTRE IL PONTE. E LA.',
+    ilMichele2: 'ALLORA E FINITA. VADO A PRENDERMELO.',
+    ilMichele3: 'ATTENTO. LUIGI TIENE IL PONTE, E NON TI LASCIA PASSARE.',
+    // Level 5, Boss Luigi. Nobody is rescued -- Gere is alone on the bridge,
+    // and both lines are his.
+    ilLuigi1: 'IL PONTE E LIBERO. ALZATI, LUIGI, NON E COLPA TUA.',
+    ilLuigi2: 'MEEOTTEE. ULTIMA PORTA. ARRIVO.',
+    // Level 6, the end. Roger, on his feet, and the line that closes what
+    // the opening cutscene opened.
+    ilFinal1: 'FIGLIO MIO... SEI VENUTO DAVVERO.',
+    ilFinal2: 'TE L AVEVO DETTO, PAPA. STAVO ARRIVANDO.',
+    ilFinal3: 'SAN GIORGIO E NOSTRA. E STANOTTE TORNIAMO A CASA TUTTI.',
+
   },
 };
 

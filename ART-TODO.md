@@ -87,10 +87,25 @@ Same sprite-pack layout as above.
 
 ## 5. Rescue characters
 
-Each level ends by naming who was saved, as text. `carla` already has a
-partial sprite pack; `gastone`, `mattia` and `michele` have none. A short
-`idle_right` + `victory` clip each would allow an actual rescue moment at
-the end of a level rather than a line of type.
+Each level now ends with a story scene (`web/js/interlude.js`) in which the
+rescued relative speaks. `carla` and `roger` have packs and appear as
+themselves; `gastone`, `mattia` and `michele` fall back to a coloured vector
+figure.
+
+A pack needs only ONE standing clip to appear properly — `idle_right`,
+`walk_right` or `wave`, whichever exists (see `INTERLUDE_STANDING_CLIPS`).
+Then add one line to `INTERLUDE_CHARACTERS`:
+
+```js
+const INTERLUDE_CHARACTERS = {
+  carla: 'carla',
+  family: 'roger',
+  gastone: 'gastone',   // <- once assets/release/gastone_sprites/ exists
+};
+```
+
+Figures are auto-scaled to a common height, so a pack authored at any size
+stands correctly beside Gere.
 
 ---
 
@@ -104,5 +119,7 @@ So you can add art in any order without breaking anything:
   clips nothing has drawn yet. They are expected.)
 - **A missing background** leaves the level on the placeholder street.
 - **A missing card splash** falls back to the speed-line card.
+- **A missing family sprite pack** draws a coloured vector figure in the
+  story scene, at the right height, so the scene still plays.
 - **A missing boss type** would be a real error — so add the `EnemyTypes`
   entry in the same change as the `boss:` reference.

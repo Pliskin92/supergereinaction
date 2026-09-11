@@ -19,7 +19,7 @@ const bundles = {
   'bundle-level.js': [
     'i18n.js', 'sprites.js', 'assets.js', 'entities.js',
     'fury-hud.js', 'highscores.js', 'campaign.js', 'intro.js', 'level-card.js',
-    'level.js', 'touch.js',
+    'interlude.js', 'level.js', 'touch.js',
   ],
   'bundle-arena.js': [
     'i18n.js', 'sprites.js', 'assets.js', 'entities.js',

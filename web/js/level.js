@@ -221,6 +221,16 @@ window.addEventListener('keydown', (e) => {
     e.preventDefault();
     return;
   }
+  // The rescue scene owns the keyboard while it plays: Enter or Space cuts
+  // it short, Escape leaves. Checked before the summary branch below, which
+  // is live at the same time (levelClear is already set) and would
+  // otherwise swallow the key.
+  if (interlude && !interlude.done) {
+    if (e.key === 'Enter' || e.key === ' ') interlude.skip();
+    else if (e.key === 'Escape') { clearRun(); window.location.href = '/index.html'; }
+    e.preventDefault();
+    return;
+  }
   if (levelClear) {
     // Escape abandons the run outright rather than leaving it half-played
     // in storage for the next visit to resume into.
@@ -315,6 +325,11 @@ let assetsReady = false;
 // on a replay within the same session (see levelSetUp) so retrying a run
 // does not mean sitting through it again.
 let intro = null;
+
+// The scene that plays when the boss goes down: the rescue, and the
+// hand-off to the next street. Runs BEFORE the summary -- the story beat
+// belongs to the fight that just ended, not to the score screen.
+let interlude = null;
 
 // The card that announces this level, shown once the assets are in and
 // after the cutscene (level 1) or straight away (levels 2-6). Null once it
@@ -683,6 +698,13 @@ function update() {
     clearPressed();
     return;
   }
+  // The rescue scene runs over the stopped world, before the summary.
+  if (interlude && !interlude.done) {
+    interlude.update();
+    furyPopup.update();
+    clearPressed();
+    return;
+  }
   // Once the level is won (or lost) the world stops: the summary is a
   // screen, not something to keep fighting behind.
   if (levelClear || player.gameOver) {
@@ -827,6 +849,11 @@ function checkLevelClear() {
   levelClear = {
     seconds, timeBonus, livesBonus, total, isRecord, finished,
   };
+  // The rescue scene, if this level has one. It is created here rather than
+  // drawn from the summary because it plays INSTEAD of the summary for its
+  // duration: draw() shows whichever is live.
+  const scene = new Interlude(W, H, level);
+  if (!scene.done) interlude = scene;
   nameEntry = '';
   scoreSaved = false;
   // A run that does not make the table is simply not recorded; there is
@@ -1224,7 +1251,10 @@ function draw() {
   // Over the top of the world, so its closing fade dissolves into the
   // level already running underneath rather than cutting to it.
   if (levelCard && !levelCard.done) levelCard.draw(ctx);
-  if (levelClear) drawLevelClear();
+  // While the rescue scene is playing it stands in for the summary; the
+  // summary follows once it finishes or is skipped.
+  if (interlude && !interlude.done) interlude.draw(ctx);
+  else if (levelClear) drawLevelClear();
   else if (player.gameOver) drawGameOver();
 }
 
@@ -1242,6 +1272,9 @@ function loop() {
 window.touchState = () => ({
   cutscene: !!(intro && !intro.done),
   card: !!(levelCard && !levelCard.done),
+  // The rescue scene is key-driven like the rest, so a thumb reaches it as
+  // a synthetic Enter rather than as Input state.
+  interlude: !!(interlude && !interlude.done),
   summary: !!levelClear,
   gameOver: !!(player && player.gameOver),
 });
