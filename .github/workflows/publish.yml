@@ -1,0 +1,148 @@
+# Publishes the game two ways, from one push to main:
+#
+#   * GitHub Pages -- the playable URL. The game is a static site with no
+#     build step, so this is just the contents of web/ with the base path
+#     rewritten (see below).
+#   * ghcr.io -- the container image, for anyone who wants to self-host it.
+#
+# Neither needs a secret: Pages uses its own OIDC deployment, and ghcr.io
+# authenticates with the GITHUB_TOKEN that every run already has.
+
+name: Publish
+
+on:
+  push:
+    branches: [main]
+  # Lets a release be re-cut without an empty commit.
+  workflow_dispatch:
+
+# A second push while the first is still deploying would otherwise race it
+# onto Pages. Newer wins; the in-flight one is left to finish rather than
+# cancelled, because cancelling a half-finished deployment is what leaves a
+# site serving a mixture of two builds.
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  pages:
+    name: Deploy to GitHub Pages
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # The pages are written for a domain root: <base href="/"> plus
+      # absolute links (/level/index.html, /css/mobile.css). A PROJECT Pages
+      # site is served from /<repo>/ instead, so those all resolve one level
+      # too high and every page 404s.
+      #
+      # The base path is rewritten here rather than made relative in the
+      # source, because the game navigates BETWEEN directories at different
+      # depths (/index.html -> /level/index.html -> back), and relative paths
+      # that work from one depth break from the other. Rewriting at deploy
+      # time keeps the source correct for `python3 -m http.server` and for
+      # the Docker image, both of which really are served from a root.
+      - name: Rewrite absolute paths for the project subpath
+        run: |
+          set -euo pipefail
+          BASE="/${GITHUB_REPOSITORY#*/}"
+          echo "Deploying under $BASE"
+          # <base href="/"> is what every relative asset URL resolves
+          # against, so this one line fixes the sprite/atlas loads too.
+          find web -name '*.html' -print0 \
+            | xargs -0 sed -i \
+                -e "s|<base href=\"/\" />|<base href=\"$BASE/\" />|g" \
+                -e "s|href=\"/css/|href=\"$BASE/css/|g" \
+                -e "s|href=\"/manifest.webmanifest\"|href=\"$BASE/manifest.webmanifest\"|g" \
+                -e "s|href=\"/assets/|href=\"$BASE/assets/|g" \
+                -e "s|href=\"/index.html\"|href=\"$BASE/index.html\"|g" \
+                -e "s|href=\"/level/index.html\"|href=\"$BASE/level/index.html\"|g" \
+                -e "s|url=/level/index.html|url=$BASE/level/index.html|g" \
+                -e "s|'/index.html'|'$BASE/index.html'|g" \
+                -e "s|'/level/index.html'|'$BASE/level/index.html'|g" \
+                -e "s|'/arena/index.html'|'$BASE/arena/index.html'|g"
+          # The JS navigates with absolute URLs too. The quoted-path rules
+          # are applied to the HTML as well (above), because /game/ carries
+          # its redirect in an INLINE script that a *.js sweep never sees.
+          find web -name '*.js' -print0 \
+            | xargs -0 sed -i \
+                -e "s|'/index.html'|'$BASE/index.html'|g" \
+                -e "s|'/level/index.html'|'$BASE/level/index.html'|g" \
+                -e "s|'/arena/index.html'|'$BASE/arena/index.html'|g"
+          # The manifest's own URLs are absolute as well.
+          sed -i \
+            -e "s|\"/index.html\"|\"$BASE/index.html\"|g" \
+            -e "s|\"/\"|\"$BASE/\"|g" \
+            -e "s|\"/assets/|\"$BASE/assets/|g" \
+            web/manifest.webmanifest
+
+      # Jekyll would otherwise ignore any file or directory starting with an
+      # underscore. None exist today, but a future sprite pack named that way
+      # would vanish from the site with no error.
+      - name: Disable Jekyll processing
+        run: touch web/.nojekyll
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+
+      - id: deploy
+        uses: actions/deploy-pages@v4
+
+  image:
+    name: Publish image to ghcr.io
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          # Every workflow run has this already; no secret to configure.
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # The image name must be lowercase, and the owner here is not
+      # (Pliskin92), so it cannot simply be interpolated.
+      - name: Work out the image name
+        id: name
+        run: echo "image=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
+      - name: Tag the image
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.name.outputs.image }}
+          # `latest` for the newest main, plus the commit sha so a specific
+          # build can always be pulled back.
+          tags: |
+            type=raw,value=latest
+            type=sha,format=long
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # Phones and Apple Silicon are arm64; CI runners and most servers
+          # are amd64. Both are built so `docker run` works either way.
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

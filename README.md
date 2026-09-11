@@ -30,11 +30,41 @@ Or simply open `web/index.html` directly in any modern browser.
 
 ### Run with Docker
 
+Pull the published image (no build needed):
+
+```bash
+docker run -p 8080:80 ghcr.io/pliskin92/supergereinaction:latest
+# then open http://localhost:8080
+```
+
+Or build it yourself:
+
 ```bash
 docker build -t super-gere .
 docker run -p 8080:80 super-gere
-# then open http://localhost:8080
 ```
+
+## Publishing
+
+`.github/workflows/publish.yml` runs on every push to `main` and does two
+things:
+
+- **GitHub Pages** — deploys `web/` as the playable site. The source is
+  written for a domain root (`<base href="/">` and absolute links), so the
+  workflow rewrites those to the project subpath at deploy time. That is
+  done in the workflow rather than in the source because the game navigates
+  between directories at different depths, where relative paths that work
+  from one break from the other — and because the Docker image and
+  `python3 -m http.server` really are served from a root.
+- **ghcr.io** — builds and pushes the container image for `linux/amd64` and
+  `linux/arm64`, tagged `latest` and with the commit SHA.
+
+Neither needs a secret: Pages uses OIDC and ghcr.io uses the built-in
+`GITHUB_TOKEN`.
+
+**One-time setup** — in the repo's *Settings → Pages*, set **Source** to
+**GitHub Actions**. Until that is done the Pages job fails; the image job is
+unaffected.
 
 ## Controls
 
