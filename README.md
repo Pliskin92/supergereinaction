@@ -44,6 +44,50 @@ docker build -t super-gere .
 docker run -p 8080:80 super-gere
 ```
 
+## Controls
+
+| Action | Keys |
+|--------|------|
+| **Move** | Arrow Keys or WASD |
+| **Jump** | Space |
+| **Punch Combo (punch-punch-kick)** | J |
+| **Roll** | K |
+| **Heavy Attack** | L |
+| **Pause** | P |
+| **Confirm / Buy in Shop** | Enter |
+| **Leave Shop** | Escape |
+| **Call assist** (once unlocked) | U |
+| **Switch assist** | I |
+
+## Mobile
+
+The game plays on phones and tablets. Open the same URL in a mobile browser:
+an on-screen pad appears on touch devices, the canvas fills the screen, and
+in portrait the game asks to be turned (it is a wide side-scroller). Nothing
+changes on desktop — the pad is gated on `(pointer: coarse)`, so a narrow
+desktop window keeps its keyboard and its layout.
+
+It is also an installable PWA (`web/manifest.webmanifest`) — "Add to Home
+Screen" launches it fullscreen in landscape with no browser chrome.
+
+| Touch | Action |
+|---|---|
+| **D-pad** (bottom left) | Move |
+| **A** | Punch combo |
+| **B** | Roll |
+| **C** | Heavy attack |
+| **⇑** | Jump |
+| **U** (once unlocked) | Call assist |
+| **☰** (bottom centre) | Back to menu |
+
+On keyboard-driven screens (menus, the shop, a summary) the pad's A confirms
+and B goes back, rather than sending their gameplay keys — without that the
+shop could be browsed on a phone but never bought from.
+
+On menus, cutscenes and summaries the pad drives the existing keyboard
+handlers by dispatching synthetic key events, so those screens needed no
+touch-specific code (see `web/js/touch.js`).
+
 ## Publishing
 
 `.github/workflows/publish.yml` builds and pushes the container image to
@@ -77,6 +121,16 @@ highscore table — a run abandoned partway is not recorded.
 Levels are described by a single table, `web/js/campaign.js`: backdrop,
 walkable band, length, roster, pack sizes, boss and who is rescued. Adding
 a level is a row there, not another copy of `level.js`.
+
+Rescuing **Mattia** (level 3) and **Michele** (level 4) unlocks them as
+assists: press **U** to call one into a fight for 20 seconds, then a
+45-second cooldown, **I** to choose which. Mattia is fast and hits often;
+Michele is slow and hits hard. They pick their own targets and cannot be
+hurt.
+
+Between levels a **shop** spends score on permanent upgrades — an extra
+life, +20 max HP, +15% damage. Points spent are gone from the final total,
+so it is a running choice between finishing and scoring.
 
 Each level ends with a short story scene — the rescue, and the hand-off to
 the next street — written in `web/js/interlude.js`. The dialogue is Italian

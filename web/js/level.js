@@ -176,7 +176,11 @@ const LEVEL_EDGE_MARGIN = 0.18;
 
 const Input = {
   held: { left: false, right: false, up: false, down: false, run: false },
-  pressed: { punch: false, slide: false, heavy: false, jump: false },
+  pressed: {
+    punch: false, slide: false, heavy: false, jump: false,
+    // Call an assist, and change which one the next call brings.
+    assist: false, assistCycle: false,
+  },
 };
 // Published deliberately for the touch pad (js/touch.js), which loads last
 // and writes into exactly this object so that a thumb and a keyboard reach
@@ -231,6 +235,14 @@ window.addEventListener('keydown', (e) => {
     e.preventDefault();
     return;
   }
+  // The shop owns the keyboard while it is open: arrows pick a row, Enter
+  // buys, Escape/Space leaves. Checked ahead of the summary for the same
+  // reason the scene is -- levelClear is already set underneath it.
+  if (shop && !shop.done && (!interlude || interlude.done)) {
+    shop.handleKey(e.key);
+    e.preventDefault();
+    return;
+  }
   if (levelClear) {
     // Escape abandons the run outright rather than leaving it half-played
     // in storage for the next visit to resume into.
@@ -257,6 +269,10 @@ window.addEventListener('keydown', (e) => {
     if (e.key === 'k' || e.key === 'K') Input.pressed.slide = true;
     if (e.key === 'l' || e.key === 'L') Input.pressed.heavy = true;
     if (e.key === ' ') Input.pressed.jump = true;
+    // Assists. Only bound once the run has unlocked one, so the keys do
+    // nothing in a fresh run rather than silently failing.
+    if (e.key === 'u' || e.key === 'U') Input.pressed.assist = true;
+    if (e.key === 'i' || e.key === 'I') Input.pressed.assistCycle = true;
     // No debug FURY key here: in the level the meter has to be earned by
     // landing and taking hits. Forcing it is an arena-only convenience.
     // Root-relative: this page sets <base href="/">.
@@ -283,6 +299,8 @@ function clearPressed() {
   Input.pressed.slide = false;
   Input.pressed.heavy = false;
   Input.pressed.jump = false;
+  Input.pressed.assist = false;
+  Input.pressed.assistCycle = false;
 }
 
 let background = null;
@@ -308,6 +326,10 @@ let nextEncounterAt = 0;
 // open. The player cannot walk past it until the group is cleared.
 let lockUntilX = 0;
 const furyPopup = new FuryPopup();
+// The uncles this run has unlocked, and the summoning cooldown. Built from
+// the run's rescued list, so a fresh run has none and a run that has taken
+// levels 3 and 4 has both.
+const assists = new AssistCorps(run);
 
 // ---- End of run ----
 // Frames the run has been going, which drives the clock in the HUD and the
@@ -330,6 +352,11 @@ let intro = null;
 // hand-off to the next street. Runs BEFORE the summary -- the story beat
 // belongs to the fight that just ended, not to the score screen.
 let interlude = null;
+
+// The shop, opened after the rescue scene and before the summary. Null on
+// the last level: there is no next street to prepare for, and points spent
+// there would simply be points off the final score.
+let shop = null;
 
 // The card that announces this level, shown once the assets are in and
 // after the cutscene (level 1) or straight away (levels 2-6). Null once it
@@ -422,6 +449,10 @@ function layoutLevel(img) {
   // Mid-campaign levels resume the run's score and surviving lives; level 1
   // of a fresh run has nothing to restore and starts at the defaults.
   if (levelIndex > 0) player.resumeRun(run);
+  // Anything bought in the shop (or granted by a boss drop) is restored
+  // here. The page reloads between levels, so without this a purchase
+  // would vanish on the next level's first frame.
+  applyRunUpgrades(player, run);
   spawnEnemies();
 }
 
@@ -705,6 +736,12 @@ function update() {
     clearPressed();
     return;
   }
+  // The shop follows the rescue scene, and holds the world the same way.
+  if (shop && !shop.done && (!interlude || interlude.done)) {
+    shop.update();
+    clearPressed();
+    return;
+  }
   // Once the level is won (or lost) the world stops: the summary is a
   // screen, not something to keep fighting behind.
   if (levelClear || player.gameOver) {
@@ -761,6 +798,12 @@ function update() {
     }
     if (player.x >= nextEncounterX()) triggerEncounter();
   }
+  // Assists: the summon press, then the active uncle's own turn. Both are
+  // inside the normal update, so a summoned assist is frozen by the same
+  // things that freeze everything else (the FURY cut-in, the summary).
+  if (Input.pressed.assistCycle) assists.cycle();
+  if (Input.pressed.assist) assists.summon(player, bounds);
+  assists.update(enemies, bounds);
   resolvePlayerAttacks(player, enemies);
   // Drop loot on DEATH rather than when the body is retired.
   //
@@ -854,6 +897,9 @@ function checkLevelClear() {
   // duration: draw() shows whichever is live.
   const scene = new Interlude(W, H, level);
   if (!scene.done) interlude = scene;
+  // The shop follows the scene. Not on the final level -- there is nothing
+  // left to buy anything for.
+  if (!isFinalLevel()) shop = new Shop(W, H, level, player, run);
   nameEntry = '';
   scoreSaved = false;
   // A run that does not make the table is simply not recorded; there is
@@ -1041,9 +1087,59 @@ function drawHud() {
     ctx.textAlign = 'left';
   }
 
+  // Assist readout, under the panel: who the next call brings, and whether
+  // it is ready. Drawn only once the run has unlocked someone, so a run
+  // that has not reached level 3 has no dead UI on screen.
+  if (assists.available) {
+    // Below the panel's PLATE (which is drawn to panelH + 8 from faceY - 4),
+    // not merely below panelH: the plate is the thing the chip must clear,
+    // and sitting at +18 put it on top of the FURY caption.
+    const ay = faceY + panelH + 14;
+    const chipH = 16;
+    // The chip carries "U:<name>" on the left and, while an assist is out,
+    // a seconds count on the right. Both are measured, rather than the name
+    // plus a guessed pad: at a fixed +40 the timer landed on top of the
+    // name for any name longer than a few characters.
+    const name = t(assists.next.nameKey);
+    ctx.font = 'bold 10px monospace';
+    const label = `U:${name}`;
+    const timerText = assists.active
+      ? `${Math.ceil(assists.active.timer / 60)}s`
+      : '';
+    const chipW = ctx.measureText(label).width
+      + (timerText ? ctx.measureText(timerText).width + 10 : 0) + 14;
+    const ready = assists.ready;
+    ctx.fillStyle = 'rgba(8,6,14,0.5)';
+    rr(ctx, faceX, ay, chipW, chipH, 4);
+    ctx.fill();
+    // The cooldown fills the chip back up, so the wait is visible rather
+    // than guessed at.
+    if (!ready) {
+      const filled = assists.active
+        ? 1
+        : 1 - assists.cooldown / ASSIST_COOLDOWN;
+      ctx.fillStyle = 'rgba(0,245,212,0.18)';
+      rr(ctx, faceX, ay, chipW * clamp(filled, 0, 1), chipH, 4);
+      ctx.fill();
+    }
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = ready ? '#00f5d4' : 'rgba(255,255,255,0.55)';
+    ctx.fillText(label, faceX + 7, ay + chipH / 2);
+    // The seconds an active assist has left, in the space reserved above.
+    if (timerText) {
+      ctx.textAlign = 'right';
+      ctx.fillStyle = '#ffd54d';
+      ctx.fillText(timerText, faceX + chipW - 7, ay + chipH / 2);
+    }
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+  }
+
   // Progress along the level, under the panel.
   const pct = worldWidth > W ? clamp(player.x / worldWidth, 0, 1) : 0;
-  const py = faceY + panelH + 8;
+  // Below the assist chip when there is one, so the two do not overlap.
+  const py = faceY + panelH + (assists.available ? 40 : 8);
   ctx.fillStyle = 'rgba(0,0,0,0.5)';
   ctx.fillRect(faceX, py, HUD_FACE + HUD_GUTTER + HUD_BAR_W, 5);
   ctx.fillStyle = '#8a8ad0';
@@ -1240,7 +1336,12 @@ function draw() {
 
   // Pickups draw under the cast so a character standing on one still reads.
   for (const potion of potions) potion.draw(ctx, cameraX);
-  const actors = [player, ...visible].sort((a, b) => a.y - b.y);
+  // A summoned assist sorts by depth with everyone else, so he stands in
+  // front of or behind the cast according to where he is in the lane rather
+  // than always on top.
+  const actors = [player, ...visible];
+  if (assists.active) actors.push(assists.active);
+  actors.sort((a, b) => a.y - b.y);
   for (const actor of actors) actor.draw(ctx, cameraX);
   // Score numbers sit above the cast: they must stay readable over the
   // body they were scored on.
@@ -1254,6 +1355,7 @@ function draw() {
   // While the rescue scene is playing it stands in for the summary; the
   // summary follows once it finishes or is skipped.
   if (interlude && !interlude.done) interlude.draw(ctx);
+  else if (shop && !shop.done) shop.draw(ctx);
   else if (levelClear) drawLevelClear();
   else if (player.gameOver) drawGameOver();
 }
@@ -1275,6 +1377,7 @@ window.touchState = () => ({
   // The rescue scene is key-driven like the rest, so a thumb reaches it as
   // a synthetic Enter rather than as Input state.
   interlude: !!(interlude && !interlude.done),
+  shop: !!(shop && !shop.done),
   summary: !!levelClear,
   gameOver: !!(player && player.gameOver),
 });

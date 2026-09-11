@@ -97,6 +97,16 @@ const Strings = {
     rescue_mattia: 'UNCLE MATTIA',
     rescue_michele: 'UNCLE MICHELE',
     rescue_family: 'THE WHOLE FAMILY',
+    // ---- Shop and assists ----
+    shopTitle: 'SHOP',
+    shopLife: 'EXTRA LIFE',
+    shopVitality: 'VITALITY  (+20 MAX HP)',
+    shopPower: 'POWER  (+15% DAMAGE)',
+    shopBought: 'BOUGHT!',
+    shopTooPoor: 'NOT ENOUGH POINTS',
+    shopHint: 'ARROWS PICK \u00b7 ENTER BUY \u00b7 ESC LEAVE',
+    assistReady: 'ASSIST READY',
+
     // ---- Interludes: the scene after each rescue ----
     // Italian in BOTH languages, like the opening cutscene and for the same
     // reason: the family is Italian and these are their voices, not UI. Only
@@ -211,6 +221,16 @@ const Strings = {
     rescue_mattia: 'ZIO MATTIA',
     rescue_michele: 'ZIO MICHELE',
     rescue_family: 'TUTTA LA FAMIGLIA',
+    // ---- Negozio e aiutanti ----
+    shopTitle: 'NEGOZIO',
+    shopLife: 'VITA EXTRA',
+    shopVitality: 'VITALITA  (+20 HP MAX)',
+    shopPower: 'POTENZA  (+15% DANNI)',
+    shopBought: 'COMPRATO!',
+    shopTooPoor: 'PUNTI INSUFFICIENTI',
+    shopHint: 'FRECCE SCEGLI \u00b7 INVIO COMPRA \u00b7 ESC ESCI',
+    assistReady: 'AIUTANTE PRONTO',
+
     // ---- Interludes: the scene after each rescue ----
     // Italian in BOTH languages, like the opening cutscene and for the same
     // reason: the family is Italian and these are their voices, not UI. Only

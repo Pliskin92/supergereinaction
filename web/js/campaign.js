@@ -158,7 +158,17 @@ function clampIndex(index) {
 const RUN_KEY = 'supergere.run';
 
 function newRun() {
-  return { level: 0, score: 0, lives: difficultyLives(), rescued: [] };
+  return {
+    level: 0,
+    score: 0,
+    lives: difficultyLives(),
+    rescued: [],
+    // No upgrades yet; see loadRun for why these are named rather than
+    // left to appear when first written.
+    maxHp: undefined,
+    maxLives: undefined,
+    atkMultiplier: undefined,
+  };
 }
 
 function loadRun() {
@@ -167,11 +177,23 @@ function loadRun() {
     if (raw) {
       const stored = JSON.parse(raw);
       // A stored run from an older build may be missing fields added since.
+      //
+      // Every field the run carries has to be listed here: this rebuilds a
+      // known shape rather than spreading `stored`, so anything omitted is
+      // silently dropped on the next page load. The upgrade fields below
+      // are exactly that -- the shop wrote them and they vanished between
+      // levels until they were named here.
       return {
         level: clampIndex(stored.level),
         score: Number(stored.score) || 0,
         lives: Number(stored.lives) || difficultyLives(),
         rescued: Array.isArray(stored.rescued) ? stored.rescued : [],
+        // Permanent upgrades, from the shop and from boss drops. Undefined
+        // until something grants one; applyRunUpgrades() ignores absent
+        // values rather than treating them as zero.
+        maxHp: Number(stored.maxHp) || undefined,
+        maxLives: Number(stored.maxLives) || undefined,
+        atkMultiplier: Number(stored.atkMultiplier) || undefined,
       };
     }
   } catch (e) { /* storage blocked or unreadable; start a fresh run */ }

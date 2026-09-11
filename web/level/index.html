@@ -66,6 +66,11 @@
 <!-- The between-level story scenes. Uses intro.js's bubble and figure
      helpers, so it loads after it. -->
 <script src="js/interlude.js?v=11"></script>
+<!-- The unlockable uncles, summoned into a fight. -->
+<script src="js/assist.js?v=11"></script>
+<!-- The between-levels shop. Uses level-card.js's art table, so it
+     loads after it. -->
+<script src="js/shop.js?v=11"></script>
 <script src="js/level.js?v=11"></script>
 <!-- Touch controls. Builds the on-screen pad on coarse-pointer
      devices and does nothing anywhere else. -->
@@ -74,7 +79,9 @@
   document.getElementById('controlsHint').textContent = `${t('controls')} \u00b7 ESC`;
   // The pad builds itself only on coarse-pointer devices; on desktop this
   // is a no-op and the keyboard handlers are untouched.
-  setUpTouchControls();
+  // `assists` gates the U button: it is only built once the run has
+  // unlocked an uncle to call.
+  setUpTouchControls({ assists: typeof assists !== 'undefined' && assists.available });
   document.getElementById('rotateText').textContent = t('rotateDevice');
 </script>
 </body>

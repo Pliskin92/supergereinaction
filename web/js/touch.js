@@ -45,8 +45,12 @@ function sendKey(key) {
 // is down; `tap` buttons fire Input.pressed once per touch, the way the
 // keyboard's one-shot actions do.
 //
-// `key` is what gets dispatched when the pad is driving a menu rather than
-// gameplay, so a d-pad works the title screen and A confirms.
+// `key` is the gameplay key. `menuKey` is what a press sends on a
+// keyboard-driven screen (a menu, the shop, a summary) -- they differ
+// because the gameplay keys are meaningless there: A must confirm, not
+// throw a punch, or the shop can be browsed on a phone but never bought
+// from. A button with no menuKey sends its gameplay key, which is right for
+// the d-pad (arrows mean the same thing on both).
 const TOUCH_BUTTONS = [
   { id: 'left', label: '◀', kind: 'hold', slot: 'left', key: 'ArrowLeft' },
   { id: 'right', label: '▶', kind: 'hold', slot: 'right', key: 'ArrowRight' },
@@ -54,10 +58,17 @@ const TOUCH_BUTTONS = [
   { id: 'down', label: '▼', kind: 'hold', slot: 'down', key: 'ArrowDown' },
   // The action cluster. Punch is the one used constantly, so it is the
   // biggest and sits under the thumb's resting position.
-  { id: 'punch', label: 'A', kind: 'tap', slot: 'punch', key: 'j', primary: true },
-  { id: 'roll', label: 'B', kind: 'tap', slot: 'slide', key: 'k' },
-  { id: 'heavy', label: 'C', kind: 'tap', slot: 'heavy', key: 'l' },
-  { id: 'jump', label: '⇑', kind: 'tap', slot: 'jump', key: ' ' },
+  {
+    id: 'punch', label: 'A', kind: 'tap', slot: 'punch', key: 'j',
+    menuKey: 'Enter', primary: true,
+  },
+  { id: 'roll', label: 'B', kind: 'tap', slot: 'slide', key: 'k', menuKey: 'Escape' },
+  { id: 'heavy', label: 'C', kind: 'tap', slot: 'heavy', key: 'l', menuKey: 'Enter' },
+  { id: 'jump', label: '⇑', kind: 'tap', slot: 'jump', key: ' ', menuKey: ' ' },
+  // Calling an uncle in. Shown only once a run has unlocked one -- see
+  // setUpTouchControls -- so it is not dead chrome for the first two
+  // levels.
+  { id: 'assist', label: 'U', kind: 'tap', slot: 'assist', key: 'u', menuKey: 'Enter', unlockable: true },
 ];
 
 // Reads one of the game-state globals the pad has to consult.
@@ -83,7 +94,7 @@ function touchWantsKeys() {
   const state = globalOrNull('touchState');
   if (typeof state === 'function') {
     const s = state();
-    if (s.cutscene || s.card || s.interlude || s.summary || s.gameOver) return true;
+    if (s.cutscene || s.card || s.interlude || s.shop || s.summary || s.gameOver) return true;
   }
   // The title screen has no Input object at all -- it is a menu, and menus
   // are always key-driven.
@@ -117,7 +128,7 @@ function setUpTouchControls(options = {}) {
     el.classList.add('pressed');
     // On a menu/cutscene the pad speaks keyboard; in play it speaks Input.
     if (touchWantsKeys()) {
-      sendKey(def.key);
+      sendKey(def.menuKey || def.key);
       return;
     }
     const input = globalOrNull('Input');
@@ -129,6 +140,9 @@ function setUpTouchControls(options = {}) {
   };
 
   for (const def of TOUCH_BUTTONS) {
+    // A button gated on an unlock is only built when the page says the
+    // feature is live, rather than sitting inert on screen.
+    if (def.unlockable && !options.assists) continue;
     const el = document.createElement('button');
     el.type = 'button';
     el.className = `touch-btn touch-${def.id}${def.primary ? ' touch-primary' : ''}`;

@@ -85,7 +85,26 @@ pair via their `minions: { standard, tough }` field, so a garage level
 could field mechanics and a workshop level could field something else.
 Same sprite-pack layout as above.
 
-## 5. Rescue characters
+## 5. Assist sprites (Mattia, Michele)
+
+Rescuing them unlocks them as summonable assists (`web/js/assist.js`).
+Neither has a pack, so both currently appear as coloured vector figures that
+walk and punch. A pack at `web/assets/release/<name>_sprites/` with
+`idle_right`, `walk_right` and `punch` makes them appear as themselves — no
+code change, the lookup already tries those clips and falls back.
+
+## 6. Shop backdrops
+
+You already have art for all five shops in `web/assets/private/`:
+`shop_grandma_kitchen.jpg`, `shop_grandpa_garage.jpg`,
+`shop_mattia_workshop.jpg`, `shop_michele_yard.jpg`, `shop_boss_luigi.jpg`.
+
+They are not shipped (`assets/private/` is excluded from the image). To use
+one, move it into `web/assets/release/shops/` and add `shopArt` to that
+level's campaign row. Without it the shop draws a plain dark panel, which
+works but is plain.
+
+## 7. Rescue characters
 
 Each level now ends with a story scene (`web/js/interlude.js`) in which the
 rescued relative speaks. `carla` and `roger` have packs and appear as

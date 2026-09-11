@@ -205,6 +205,10 @@
    where the score and combo are drawn, and a button there covered them. The
    gap between the clusters is dead space no finger rests on, so an
    easy-to-avoid button belongs exactly there. */
+/* The assist button sits above the action cluster, out of the way of the
+   attacks so a summon is never thrown by accident mid-combo. */
+.touch-assist { right: calc(104px + env(safe-area-inset-right, 0px)); bottom: 168px; }
+
 .touch-esc {
   bottom: calc(10px + env(safe-area-inset-bottom, 0px));
   left: 50%;
@@ -231,5 +235,6 @@
   .touch-roll  { right: calc(76px + env(safe-area-inset-right, 0px)); bottom: 20px; }
   .touch-heavy { right: calc(20px + env(safe-area-inset-right, 0px)); bottom: 76px; }
   .touch-jump  { right: calc(80px + env(safe-area-inset-right, 0px)); bottom: 80px; }
+  .touch-assist { right: calc(86px + env(safe-area-inset-right, 0px)); bottom: 140px; }
   .touch-esc   { width: 32px; height: 32px; font-size: 13px; }
 }
