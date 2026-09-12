@@ -12,6 +12,7 @@ const Languages = {
 const Strings = {
   en: {
     newGame: 'NEW GAME',
+    continue: 'CONTINUE',
     arena: 'ARENA',
     highscores: 'HIGHSCORES',
     options: 'OPTIONS',
@@ -20,22 +21,137 @@ const Strings = {
     selectHint: 'ARROWS + ENTER',
     noScores: 'NO SCORES YET',
     fury: 'FURY',
-    // Kept in English in both languages: they are the cartoon title cards.
-    level1Title: 'LIVELLO 1 — LA STRADA',
-    loading: 'CARICAMENTO...',
+    level1Title: 'LEVEL 1 — THE STREET',
+    loading: 'LOADING...',
     difficulty: 'DIFFICULTY',
     exhausted: 'GERE IS EXHAUSTED!',
     comeback: "GERE'S BACK!!!",
     gameOver: 'GAME OVER',
-    gameOverHint: 'INVIO PER RICOMINCIARE',
+    gameOverHint: 'ENTER TO RESTART',
+    // Shown in place of the boss's name while it is untouchable.
+    bossShielded: 'SHIELDED!',
+    // Kept identical in both languages: they are the cartoon title cards.
     furyOn: 'SUPER GERE TRANSFORMATION!!',
     furyOff: 'SUPER GERE IS OFF! :(',
     gymTitle: 'GYM — FREE PLAY',
     controls: 'WASD/ARROWS MOVE · J PUNCH · K ROLL · L HEAVY · SPACE JUMP',
     resetSack: 'R RESET SACK · F FURY',
+    // Scoring / end of run.
+    score: 'SCORE',
+    combo: 'COMBO',
+    levelClear: 'LEVEL CLEAR!',
+    finalScore: 'FINAL SCORE',
+    timeBonus: 'TIME BONUS',
+    livesBonus: 'LIVES BONUS',
+    newRecord: 'NEW RECORD!',
+    enterName: 'TYPE YOUR NAME + ENTER',
+    continueHint: 'ENTER TO CONTINUE',
+    // Difficulty names, looked up by key from Difficulties.
+    diffEasy: 'EASY',
+    diffMedium: 'MEDIUM',
+    diffHard: 'HARD',
+    diffHell: 'HELL',
+    // Opening cutscene. The dialogue is Italian in BOTH languages -- the
+    // characters are Italian and the shouts are performance, not UI. Only
+    // the chrome (the skip prompt and the level card) is translated.
+    // The exchange, in order. Meeottee taunts, Roger refuses, Meeottee
+    // knocks him down and gloats, then calls Gere out by name; Roger, on
+    // the ground, manages one last plea.
+    introTaunt: 'E FINITA, ROGER. NON PUOI SALVARTI.',
+    introDefy: 'MIO FIGLIO TI FERMERA!',
+    introMock: 'NESSUNO TI SENTE QUAGGIU.',
+    introDefeat: 'SAN GIORGIO E MIA. PER SEMPRE.',
+    introCall: 'MI SENTI, GERE? TUO PADRE E A TERRA!',
+    introSave: 'GERE... SALVAMI!',
+    // Gere's answer, thrown at a villain who cannot hear it, and the line
+    // he leaves on.
+    introVow: 'MR. MEEOTTEE! ORA HAI PROPRIO ESAGERATO!!!',
+    introComing: 'PAPA, STO ARRIVANDO!',
+    introSkip: 'ENTER TO SKIP',
+    introRoger: 'ROGER',
+    introVillain: 'MR. MEEOTTEE',
+    introGere: 'GERE',
+    levelStart: 'LEVEL 1 - START!',
+    // ---- Campaign ----
+    // The remaining five story levels. level1Title is above, with the
+    // strings that existed when the street was the whole game.
+    level2Title: "LEVEL 2 \u2014 GASTONE'S GARAGE",
+    level3Title: "LEVEL 3 \u2014 MATTIA'S WORKSHOP",
+    level4Title: "LEVEL 4 \u2014 MICHELE'S YARD",
+    level5Title: 'LEVEL 5 \u2014 BOSS LUIGI',
+    level6Title: 'LEVEL 6 \u2014 THE FINAL RESCUE',
+    campaignClear: 'RESCUE COMPLETE!',
+    runScore: 'SCORE SO FAR',
+    level: 'LEVEL',
+    rescueGoal: 'RESCUE',
+    cardSkip: 'ENTER TO START',
+    // Shown over the game on a phone held upright.
+    rotateDevice: 'TURN YOUR DEVICE SIDEWAYS',
+    nextLevel: 'NEXT',
+    rescued: 'RESCUED',
+    livesLeft: 'LIVES LEFT',
+    // Who each level saves. Keyed rescue_<id> so the summary looks one up
+    // straight from the campaign row's `rescue` field.
+    rescue_carla: 'GRANDMA CARLA',
+    rescue_gastone: 'GRANDPA GASTONE',
+    rescue_mattia: 'UNCLE MATTIA',
+    rescue_michele: 'UNCLE MICHELE',
+    rescue_family: 'THE WHOLE FAMILY',
+    // ---- Shop and assists ----
+    // ---- The end-game lock code ----
+    lockTitle: 'THE DOOR IS LOCKED. THE CODE IS:',
+    lockWriteItDown: 'WRITE IT DOWN. YOU WILL NEED IT.',
+    lockContinue: 'ENTER TO CONTINUE',
+    shopTitle: 'SHOP',
+    shopLife: 'EXTRA LIFE',
+    shopVitality: 'VITALITY  (+20 MAX HP)',
+    shopPower: 'POWER  (+15% DAMAGE)',
+    shopBought: 'BOUGHT!',
+    shopTooPoor: 'NOT ENOUGH POINTS',
+    shopHint: 'ARROWS PICK \u00b7 ENTER BUY \u00b7 ESC LEAVE',
+    assistReady: 'ASSIST READY',
+
+    // ---- Interludes: the scene after each rescue ----
+    // Italian in BOTH languages, like the opening cutscene and for the same
+    // reason: the family is Italian and these are their voices, not UI. Only
+    // the chrome around them is translated.
+    //
+    // The arc across the six: Gere is told, one relative at a time, that
+    // Meeottee has been taking the town apart for longer than anyone said
+    // out loud -- and that his father knew. Each rescue points at the next
+    // door, so the run reads as one night rather than six errands.
+    //
+    // Level 1, Nonna Carla. The first one out, and the one who tells him
+    // this is bigger than his father.
+    ilCarla1: 'GERE! SAPEVO CHE SARESTI VENUTO TU.',
+    ilCarla2: 'NONNA, DOV E PAPA? DIMMI DOVE LO TENGONO!',
+    ilCarla3: 'NON SOLO LUI. HANNO PRESO TUTTI. COMINCIA DAL GARAGE.',
+    // Level 2, Nonno Gastone. The one who names the thing everyone avoided.
+    ilGastone1: 'CI HANNO MESSO UN ANNO, GERE. UN ANNO INTERO.',
+    ilGastone2: 'UN ANNO?! E NESSUNO MI HA DETTO NIENTE?',
+    ilGastone3: 'TUO PADRE NON VOLEVA. VA DA MATTIA, LUI HA LE PROVE.',
+    // Level 3, Zio Mattia. The proof, and the first real lead.
+    ilMattia1: 'HO TUTTO QUI. FIRME, MAPPE, I SUOI NOMI FALSI.',
+    ilMattia2: 'ALLORA LO INCHIODIAMO. DAMMI QUELLE CARTE.',
+    ilMattia3: 'NON BASTANO LE CARTE. MICHELE SA DOVE SI NASCONDE.',
+    // Level 4, Zio Michele. The address, and the warning.
+    ilMichele1: 'IL VECCHIO DEPOSITO, OLTRE IL PONTE. E LA.',
+    ilMichele2: 'ALLORA E FINITA. VADO A PRENDERMELO.',
+    ilMichele3: 'ATTENTO. LUIGI TIENE IL PONTE, E NON TI LASCIA PASSARE.',
+    // Level 5, Boss Luigi. Nobody is rescued -- Gere is alone on the bridge,
+    // and both lines are his.
+    ilLuigi1: 'IL PONTE E LIBERO. ALZATI, LUIGI, NON E COLPA TUA.',
+    ilLuigi2: 'MEEOTTEE. ULTIMA PORTA. ARRIVO.',
+    // Level 6, the end. Roger, on his feet, and the line that closes what
+    // the opening cutscene opened.
+    ilFinal1: 'FIGLIO MIO... SEI VENUTO DAVVERO.',
+    ilFinal2: 'TE L AVEVO DETTO, PAPA. STAVO ARRIVANDO.',
+    ilFinal3: 'SAN GIORGIO E NOSTRA. E STANOTTE TORNIAMO A CASA TUTTI.',
+
   },
   it: {
     newGame: 'NUOVA PARTITA',
+    continue: 'CONTINUA',
     arena: 'ARENA',
     highscores: 'PUNTEGGI',
     options: 'OPZIONI',
@@ -51,11 +167,115 @@ const Strings = {
     comeback: 'GERE E TORNATO!!!',
     gameOver: 'GAME OVER',
     gameOverHint: 'INVIO PER RICOMINCIARE',
+    bossShielded: 'INVULNERABILE!',
     furyOn: 'SUPER GERE TRANSFORMATION!!',
     furyOff: 'SUPER GERE IS OFF! :(',
     gymTitle: 'PALESTRA — GIOCO LIBERO',
     controls: 'WASD/FRECCE MUOVI · J PUGNO · K ROTOLA · L POTENTE · SPAZIO SALTO',
     resetSack: 'R RIPRISTINA SACCO · F FURIA',
+    score: 'PUNTI',
+    combo: 'COMBO',
+    levelClear: 'LIVELLO COMPLETATO!',
+    finalScore: 'PUNTEGGIO FINALE',
+    timeBonus: 'BONUS TEMPO',
+    livesBonus: 'BONUS VITE',
+    newRecord: 'NUOVO RECORD!',
+    enterName: 'SCRIVI IL TUO NOME + INVIO',
+    continueHint: 'INVIO PER CONTINUARE',
+    diffEasy: 'FACILE',
+    diffMedium: 'MEDIA',
+    diffHard: 'DIFFICILE',
+    diffHell: 'INFERNO',
+    // The dialogue is Italian in BOTH languages -- the characters are
+    // Italian and the shouts are performance, not UI. Only the chrome
+    // (the skip prompt and the level card) is translated.
+    // The exchange, in order. Meeottee taunts, Roger refuses, Meeottee
+    // knocks him down and gloats, then calls Gere out by name; Roger, on
+    // the ground, manages one last plea.
+    introTaunt: 'E FINITA, ROGER. NON PUOI SALVARTI.',
+    introDefy: 'MIO FIGLIO TI FERMERA!',
+    introMock: 'NESSUNO TI SENTE QUAGGIU.',
+    introDefeat: 'SAN GIORGIO E MIA. PER SEMPRE.',
+    introCall: 'MI SENTI, GERE? TUO PADRE E A TERRA!',
+    introSave: 'GERE... SALVAMI!',
+    introVow: 'MR. MEEOTTEE! ORA HAI PROPRIO ESAGERATO!!!',
+    introComing: 'PAPA, STO ARRIVANDO!',
+    introSkip: 'INVIO PER SALTARE',
+    introRoger: 'ROGER',
+    introVillain: 'MR. MEEOTTEE',
+    introGere: 'GERE',
+    levelStart: 'LIVELLO 1 - VIA!',
+    // ---- Campagna ----
+    level2Title: 'LIVELLO 2 \u2014 IL GARAGE DI GASTONE',
+    level3Title: 'LIVELLO 3 \u2014 IL LABORATORIO DI MATTIA',
+    level4Title: 'LIVELLO 4 \u2014 IL CORTILE DI MICHELE',
+    level5Title: 'LIVELLO 5 \u2014 BOSS LUIGI',
+    level6Title: 'LIVELLO 6 \u2014 IL SALVATAGGIO FINALE',
+    campaignClear: 'SALVATAGGIO COMPLETO!',
+    runScore: 'PUNTEGGIO PARZIALE',
+    level: 'LIVELLO',
+    rescueGoal: 'SALVA',
+    cardSkip: 'INVIO PER INIZIARE',
+    rotateDevice: 'RUOTA IL DISPOSITIVO',
+    nextLevel: 'PROSSIMO',
+    rescued: 'SALVATO',
+    livesLeft: 'VITE RIMASTE',
+    rescue_carla: 'NONNA CARLA',
+    rescue_gastone: 'NONNO GASTONE',
+    rescue_mattia: 'ZIO MATTIA',
+    rescue_michele: 'ZIO MICHELE',
+    rescue_family: 'TUTTA LA FAMIGLIA',
+    // ---- Negozio e aiutanti ----
+    // ---- Il codice segreto finale ----
+    lockTitle: 'LA PORTA E CHIUSA. IL CODICE E:',
+    lockWriteItDown: 'SCRIVILO. TI SERVIRA.',
+    lockContinue: 'INVIO PER CONTINUARE',
+    shopTitle: 'NEGOZIO',
+    shopLife: 'VITA EXTRA',
+    shopVitality: 'VITALITA  (+20 HP MAX)',
+    shopPower: 'POTENZA  (+15% DANNI)',
+    shopBought: 'COMPRATO!',
+    shopTooPoor: 'PUNTI INSUFFICIENTI',
+    shopHint: 'FRECCE SCEGLI \u00b7 INVIO COMPRA \u00b7 ESC ESCI',
+    assistReady: 'AIUTANTE PRONTO',
+
+    // ---- Interludes: the scene after each rescue ----
+    // Italian in BOTH languages, like the opening cutscene and for the same
+    // reason: the family is Italian and these are their voices, not UI. Only
+    // the chrome around them is translated.
+    //
+    // The arc across the six: Gere is told, one relative at a time, that
+    // Meeottee has been taking the town apart for longer than anyone said
+    // out loud -- and that his father knew. Each rescue points at the next
+    // door, so the run reads as one night rather than six errands.
+    //
+    // Level 1, Nonna Carla. The first one out, and the one who tells him
+    // this is bigger than his father.
+    ilCarla1: 'GERE! SAPEVO CHE SARESTI VENUTO TU.',
+    ilCarla2: 'NONNA, DOV E PAPA? DIMMI DOVE LO TENGONO!',
+    ilCarla3: 'NON SOLO LUI. HANNO PRESO TUTTI. COMINCIA DAL GARAGE.',
+    // Level 2, Nonno Gastone. The one who names the thing everyone avoided.
+    ilGastone1: 'CI HANNO MESSO UN ANNO, GERE. UN ANNO INTERO.',
+    ilGastone2: 'UN ANNO?! E NESSUNO MI HA DETTO NIENTE?',
+    ilGastone3: 'TUO PADRE NON VOLEVA. VA DA MATTIA, LUI HA LE PROVE.',
+    // Level 3, Zio Mattia. The proof, and the first real lead.
+    ilMattia1: 'HO TUTTO QUI. FIRME, MAPPE, I SUOI NOMI FALSI.',
+    ilMattia2: 'ALLORA LO INCHIODIAMO. DAMMI QUELLE CARTE.',
+    ilMattia3: 'NON BASTANO LE CARTE. MICHELE SA DOVE SI NASCONDE.',
+    // Level 4, Zio Michele. The address, and the warning.
+    ilMichele1: 'IL VECCHIO DEPOSITO, OLTRE IL PONTE. E LA.',
+    ilMichele2: 'ALLORA E FINITA. VADO A PRENDERMELO.',
+    ilMichele3: 'ATTENTO. LUIGI TIENE IL PONTE, E NON TI LASCIA PASSARE.',
+    // Level 5, Boss Luigi. Nobody is rescued -- Gere is alone on the bridge,
+    // and both lines are his.
+    ilLuigi1: 'IL PONTE E LIBERO. ALZATI, LUIGI, NON E COLPA TUA.',
+    ilLuigi2: 'MEEOTTEE. ULTIMA PORTA. ARRIVO.',
+    // Level 6, the end. Roger, on his feet, and the line that closes what
+    // the opening cutscene opened.
+    ilFinal1: 'FIGLIO MIO... SEI VENUTO DAVVERO.',
+    ilFinal2: 'TE L AVEVO DETTO, PAPA. STAVO ARRIVANDO.',
+    ilFinal3: 'SAN GIORGIO E NOSTRA. E STANOTTE TORNIAMO A CASA TUTTI.',
+
   },
 };
 
@@ -63,10 +283,10 @@ const Strings = {
 // Settings so the title screen and the level agree without either having
 // to know about the other.
 const Difficulties = {
-  easy: { label: 'EASY', lives: 10 },
-  medium: { label: 'MEDIUM', lives: 5 },
-  hard: { label: 'HARD', lives: 2 },
-  hell: { label: 'HELL', lives: 1 },
+  easy: { labelKey: 'diffEasy', lives: 10 },
+  medium: { labelKey: 'diffMedium', lives: 5 },
+  hard: { labelKey: 'diffHard', lives: 2 },
+  hell: { labelKey: 'diffHell', lives: 1 },
 };
 const DEFAULT_DIFFICULTY = 'medium';
 
@@ -75,6 +295,13 @@ const DEFAULT_DIFFICULTY = 'medium';
 function difficultyLives() {
   const d = Difficulties[Settings.difficulty] || Difficulties[DEFAULT_DIFFICULTY];
   return d.lives;
+}
+
+// Translated name of the chosen difficulty. Call sites used to read
+// `.label` directly, which was English whatever the language was set to.
+function difficultyLabel(key) {
+  const d = Difficulties[key || Settings.difficulty] || Difficulties[DEFAULT_DIFFICULTY];
+  return t(d.labelKey);
 }
 
 const SETTINGS_KEY = 'supergere.settings';

@@ -1,0 +1,240 @@
+/* Mobile layout and the on-screen pad.
+ *
+ * Two jobs, deliberately in one file so the phone story is in one place:
+ *
+ *   1. make the canvas fill the screen instead of sitting as a small strip
+ *      in a column laid out for a desktop page
+ *   2. draw the touch pad that js/touch.js wires up
+ *
+ * Desktop is untouched: everything here is either inside a coarse-pointer
+ * media query, or keyed off .has-touch-pad, which touch.js only adds on a
+ * touch device.
+ */
+
+/* ---- Layout ----
+ *
+ * The pages stack a controls hint above the canvas in a centred column and
+ * size the canvas with `width: min(96vw, 1100px)`. On a phone that gives a
+ * 378x155 strip at the top of a 664px-tall screen: legible, but a sixth of
+ * the display, with the rest empty.
+ *
+ * The canvas is scaled to fit the viewport in BOTH axes instead, preserving
+ * its aspect. `min()` of the two ratios is what "contain" means, and doing
+ * it in CSS rather than by resizing the canvas keeps the backing store at
+ * its authored 960px -- the game's coordinates, its HUD sizes and its
+ * letterboxing all stay exactly as they are on desktop.
+ */
+@media (pointer: coarse) {
+  html, body {
+    height: 100%;
+    overflow: hidden;
+    /* The address bar hiding/showing must not resize the playfield mid-fight. */
+    overscroll-behavior: none;
+    /* A game canvas is not a document: no pinch-zoom, no double-tap zoom,
+       no text selection, no tap highlight. */
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    padding: 0;
+    gap: 0;
+    justify-content: center;
+  }
+
+  /* The keyboard hint is meaningless without a keyboard. */
+  .hint,
+  .pickers {
+    display: none;
+  }
+
+  canvas {
+    /* 960x387 for the level, 480x270 for the title, 960x480 for the arena:
+       each page's own aspect is carried by the element's width/height
+       attributes, and `aspect-ratio: auto` keeps the element honouring them.
+       Scaling up as well as down matters -- on a tablet the authored 960px
+       is comfortably SMALLER than the viewport, and `max-width` alone would
+       leave the game as a small rectangle in the middle of a big screen. */
+    width: 100vw;
+    height: auto;
+    max-width: 100vw;
+    /* Whichever limit binds first wins, which is what "contain" means: a
+       wide-but-short viewport is capped by the height, a narrow one by the
+       width. */
+    max-height: 100vh;
+    /* Honour the element's own width/height attributes as the ratio, so
+       each page keeps its aspect without this file naming three of them. */
+    aspect-ratio: auto;
+    object-fit: contain;
+    border: 0 !important;
+    /* The canvas is the whole page here. */
+    display: block;
+  }
+}
+
+/* Landscape is the playable orientation: the game is a wide side-scroller,
+ * and in portrait the canvas is squeezed into a strip with the pad on top
+ * of it. Rather than fight that, the game asks to be turned -- one clear
+ * instruction beats a cramped, technically-playable screen.
+ *
+ * The prompt covers the page rather than replacing it, so the game carries
+ * on underneath and resuming is just turning the phone back.
+ */
+#rotatePrompt {
+  display: none;
+}
+
+@media (pointer: coarse) and (orientation: portrait) {
+  #rotatePrompt {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    padding: 24px;
+    text-align: center;
+    background: #0d0c1d;
+    color: #cfc9e0;
+    font-family: 'Courier New', monospace;
+  }
+
+  #rotatePrompt .rotate-icon {
+    font-size: 56px;
+    /* A phone tipping over, so the instruction reads without the words. */
+    animation: rotate-hint 2.2s ease-in-out infinite;
+  }
+
+  #rotatePrompt strong {
+    color: #ffd54d;
+    font-size: 17px;
+    letter-spacing: 1px;
+  }
+
+  /* The pad would otherwise sit over the prompt. */
+  #touchPad {
+    display: none;
+  }
+}
+
+@keyframes rotate-hint {
+  0%, 40% { transform: rotate(0deg); }
+  60%, 100% { transform: rotate(-90deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #rotatePrompt .rotate-icon { animation: none; }
+}
+
+/* ---- The pad ----
+ *
+ * Overlaid on the canvas rather than laid out beside it: a phone in
+ * landscape has no spare vertical room, and a pad that took its own strip
+ * would shrink the playfield it exists to control. The buttons sit in the
+ * bottom corners, where thumbs already are, over parts of the frame that
+ * are mostly empty street.
+ */
+#touchPad {
+  position: fixed;
+  inset: 0;
+  /* The pad is a frame of buttons; taps between them must reach the game. */
+  pointer-events: none;
+  z-index: 50;
+}
+
+.touch-btn {
+  position: fixed;
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 0;
+  border: 2px solid rgba(255, 255, 255, 0.30);
+  border-radius: 50%;
+  background: rgba(20, 16, 34, 0.42);
+  color: rgba(255, 255, 255, 0.82);
+  font-family: 'Courier New', monospace;
+  font-size: 20px;
+  line-height: 1;
+  /* Translucent so the fight stays visible underneath, but not invisible. */
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  /* No transition on the pressed state: a game button must look pressed on
+     the frame it is pressed, not 120ms later. */
+}
+
+/* 56px is the low end of a comfortable thumb target; the primary attack
+   gets more. Both are well above the 44px accessibility floor. */
+.touch-btn { width: 56px; height: 56px; }
+.touch-primary { width: 72px; height: 72px; font-size: 26px; }
+
+.touch-btn.pressed {
+  background: rgba(255, 213, 77, 0.45);
+  border-color: rgba(255, 213, 77, 0.9);
+  color: #1a1020;
+}
+
+/* D-pad, bottom left. Laid out as a cross rather than a ring so the
+   directions are where a thumb expects them. `env(safe-area-inset-*)`
+   keeps it clear of the home indicator and any notch in landscape. */
+/* The cross is kept low and tight against the corner: the player walks
+   along the lower third of the frame, and an up-button floating at mid
+   height sat directly on top of them. */
+.touch-left   { left: calc(10px + env(safe-area-inset-left, 0px)); bottom: 62px; }
+.touch-right  { left: calc(126px + env(safe-area-inset-left, 0px)); bottom: 62px; }
+.touch-up     { left: calc(68px + env(safe-area-inset-left, 0px)); bottom: 114px; }
+.touch-down   { left: calc(68px + env(safe-area-inset-left, 0px)); bottom: 10px; }
+
+/* Action cluster, bottom right, arranged so the most-used button (punch)
+   is nearest the thumb's natural resting arc. */
+.touch-punch  { right: calc(12px + env(safe-area-inset-right, 0px)); bottom: 14px; }
+.touch-roll   { right: calc(92px + env(safe-area-inset-right, 0px)); bottom: 24px; }
+.touch-heavy  { right: calc(24px + env(safe-area-inset-right, 0px)); bottom: 92px; }
+.touch-jump   { right: calc(98px + env(safe-area-inset-right, 0px)); bottom: 98px; }
+
+/* Bottom centre, between the two thumb clusters: the canvas's top-right is
+   where the score and combo are drawn, and a button there covered them. The
+   gap between the clusters is dead space no finger rests on, so an
+   easy-to-avoid button belongs exactly there. */
+/* The assist button sits above the action cluster, out of the way of the
+   attacks so a summon is never thrown by accident mid-combo. */
+.touch-assist { right: calc(104px + env(safe-area-inset-right, 0px)); bottom: 168px; }
+
+.touch-esc {
+  bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  left: 50%;
+  transform: translateX(-50%);
+  width: 38px;
+  height: 38px;
+  font-size: 15px;
+  /* Dimmer than the action buttons: it leaves the level. */
+  background: rgba(20, 16, 34, 0.28);
+  border-color: rgba(255, 255, 255, 0.16);
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* Short landscape phones (a 390x664 device turned over is only 390 tall):
+   shrink the pad so it does not eat the playfield. */
+@media (pointer: coarse) and (orientation: landscape) and (max-height: 420px) {
+  .touch-btn { width: 48px; height: 48px; font-size: 17px; }
+  .touch-primary { width: 60px; height: 60px; font-size: 22px; }
+  .touch-left  { left: calc(8px + env(safe-area-inset-left, 0px)); bottom: 52px; }
+  .touch-right { left: calc(104px + env(safe-area-inset-left, 0px)); bottom: 52px; }
+  .touch-up    { left: calc(56px + env(safe-area-inset-left, 0px)); bottom: 96px; }
+  .touch-down  { left: calc(56px + env(safe-area-inset-left, 0px)); bottom: 8px; }
+  .touch-punch { right: calc(10px + env(safe-area-inset-right, 0px)); bottom: 12px; }
+  .touch-roll  { right: calc(76px + env(safe-area-inset-right, 0px)); bottom: 20px; }
+  .touch-heavy { right: calc(20px + env(safe-area-inset-right, 0px)); bottom: 76px; }
+  .touch-jump  { right: calc(80px + env(safe-area-inset-right, 0px)); bottom: 80px; }
+  .touch-assist { right: calc(86px + env(safe-area-inset-right, 0px)); bottom: 140px; }
+  .touch-esc   { width: 32px; height: 32px; font-size: 13px; }
+}

@@ -1,8 +1,11 @@
 <!doctype html>
 <html lang="en">
 <head>
+<!-- The page itself must not be cached, or a stale copy keeps
+     pointing at old ?v= script URLs and the fix never arrives. -->
+<meta http-equiv="Cache-Control" content="no-cache, must-revalidate" />
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
 <base href="/" />
 <title>Super Gere — Livello 1</title>
 <style>
@@ -17,21 +20,71 @@
   .hint { font-size: 12px; color: #8a8aa8; margin: 0; }
   .hint strong { color: #ffd54d; }
 </style>
+<link rel="manifest" href="/manifest.webmanifest" />
+<!-- iOS ignores the manifest's display/orientation, so the equivalent
+     meta tags are needed for an installed home-screen launch there. -->
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="theme-color" content="#0d0c1d" />
+<!-- iOS uses this rather than the manifest icons. -->
+<link rel="apple-touch-icon" href="/assets/release/icons/icon-192.png" />
+<link rel="stylesheet" href="/css/mobile.css?v=12" />
 </head>
 <body>
-<p class="hint">
-  WASD/Arrows walk · <strong>Shift</strong> run · Space jump ·
-  J punch · K roll · L heavy · <strong>ESC</strong> back
-</p>
+
+<!-- Shown only on a touch device held in portrait; see css/mobile.css. The
+     game is a wide side-scroller, so it asks to be turned rather than
+     squeezing itself into a strip. -->
+<div id="rotatePrompt">
+  <div class="rotate-icon">📱</div>
+  <strong id="rotateText"></strong>
+</div>
+<!-- Filled in from the string table once i18n.js has loaded, so the
+     controls line follows the chosen language like the rest of the UI. -->
+<p class="hint" id="controlsHint"></p>
 <!-- Height matches lv1-background.png's aspect at 960 wide, so the strip
      draws at 1:1 rather than being scaled down. -->
 <canvas id="levelCanvas" width="960" height="387"></canvas>
 
-<script src="js/i18n.js"></script>
-<script src="js/sprites.js"></script>
-<script src="js/assets.js"></script>
-<script src="js/entities.js"></script>
-<script src="js/fury-hud.js"></script>
-<script src="js/level.js"></script>
+<script src="js/i18n.js?v=11"></script>
+<script src="js/sprites.js?v=11"></script>
+<script src="js/assets.js?v=11"></script>
+<script src="js/entities.js?v=11"></script>
+<script src="js/fury-hud.js?v=11"></script>
+<!-- The level records a score at the end of the run, so it needs the
+     highscore table the title screen reads. -->
+<script src="js/highscores.js?v=11"></script>
+<!-- The campaign table and the run that walks through it. level.js reads
+     which level to play from here, so it loads first. -->
+<script src="js/campaign.js?v=11"></script>
+<!-- Opening cutscene; draws with sprites.js helpers, so it loads after it. -->
+<script src="js/intro.js?v=11"></script>
+<!-- The per-level title card. Uses intro.js's drawCoverImage, so it
+     loads after it. -->
+<script src="js/level-card.js?v=11"></script>
+<!-- The between-level story scenes. Uses intro.js's bubble and figure
+     helpers, so it loads after it. -->
+<script src="js/interlude.js?v=11"></script>
+<!-- The unlockable uncles, summoned into a fight. -->
+<script src="js/assist.js?v=11"></script>
+<!-- The between-levels shop. Uses level-card.js's art table, so it
+     loads after it. -->
+<script src="js/shop.js?v=11"></script>
+<!-- The end-game lock code. -->
+<script src="js/lockcode.js?v=11"></script>
+<script src="js/level.js?v=11"></script>
+<!-- Touch controls. Builds the on-screen pad on coarse-pointer
+     devices and does nothing anywhere else. -->
+<script src="js/touch.js?v=12"></script>
+<script>
+  document.getElementById('controlsHint').textContent = `${t('controls')} \u00b7 ESC`;
+  // The pad builds itself only on coarse-pointer devices; on desktop this
+  // is a no-op and the keyboard handlers are untouched.
+  // `assists` gates the U button: it is only built once the run has
+  // unlocked an uncle to call.
+  setUpTouchControls({ assists: typeof assists !== 'undefined' && assists.available });
+  document.getElementById('rotateText').textContent = t('rotateDevice');
+</script>
 </body>
 </html>

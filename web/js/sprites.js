@@ -215,26 +215,117 @@ function drawHeart(ctx, x, y, size, filled) {
   ctx.restore();
 }
 
-// Health potions dropped by defeated enemies.
-const POTION_DROP_CHANCE = 0.20;   // 1 in 5 enemies leaves a health potion
-const POTION_HEAL_FRACTION = 0.10; // restores this much of max health
-// A rarer red potion fills the FURY meter outright. Rolled separately and
-// checked first, so it is a flat 5% rather than a slice of the health
-// potion's chance.
-const FURY_POTION_DROP_CHANCE = 0.05;
+// Loot dropped by defeated enemies.
+//
+// One table, ordered rarest-last, rolled once over a single 0..1 range so
+// each chance is exactly what it says rather than being conditioned on the
+// previous entry having failed. The old code rolled fury first and health
+// second for precisely this reason; with five outcomes a table is clearer
+// than a chain of else-ifs, and it keeps the odds, the effect and the
+// bottle colour in one place.
+//
+// Total drop rate is 33%: 15+10+5+2+1. The remaining 67% of kills leave
+// nothing.
+const LOOT_TABLE = [
+  // kind, chance, and what picking it up does. `heal` is a fraction of max
+  // health; the other two effects are handled by kind in Potion.update().
+  { kind: 'health_small', chance: 0.15, heal: 0.10 },
+  { kind: 'health_medium', chance: 0.10, heal: 0.50 },
+  { kind: 'health_large', chance: 0.05, heal: 1.00 },
+  { kind: 'fury', chance: 0.02 },
+  { kind: 'heart', chance: 0.01 },
+];
+
+// Looked up by kind when a potion is picked up.
+const LOOT_BY_KIND = {};
+for (const entry of LOOT_TABLE) LOOT_BY_KIND[entry.kind] = entry;
+
+// Rolls the table once. Returns a kind, or null for no drop.
+function rollLoot() {
+  let roll = Math.random();
+  for (const entry of LOOT_TABLE) {
+    if (roll < entry.chance) return entry.kind;
+    roll -= entry.chance;
+  }
+  return null;
+}
+
+// A boss's own table. Beating one is a milestone, so unlike the minion
+// table this one always pays out -- the chances here divide up a certain
+// drop rather than sharing the street with a 67% chance of nothing.
+//
+// The two boosts are permanent upgrades to the run, which is what makes a
+// boss worth beating beyond simply getting past it.
+const BOSS_LOOT_TABLE = [
+  { kind: 'heart', chance: 0.34 },
+  { kind: 'boost_hp', chance: 0.33 },
+  { kind: 'boost_atk', chance: 0.33 },
+];
+
+function rollBossLoot() {
+  let roll = Math.random();
+  for (const entry of BOSS_LOOT_TABLE) {
+    if (roll < entry.chance) return entry.kind;
+    roll -= entry.chance;
+  }
+  // Rounding slack: never leave a boss's drop to a floating-point edge.
+  return BOSS_LOOT_TABLE[BOSS_LOOT_TABLE.length - 1].kind;
+}
+
+// How much each boss boost gives. Both are permanent for the rest of the
+// run: max health raised (and topped up by the same amount, so it is felt
+// immediately rather than only after the next heal), and every attack
+// hitting harder.
+const BOSS_HP_BOOST = 20;
+const BOSS_ATK_BOOST = 1.15;
+
 const POTION_PICKUP_RANGE = 46;
 const POTION_BOB_SPEED = 0.09;
 
 // Drawn procedurally: a small flask with a glow, so it reads as a pickup
 // against a busy street without needing art of its own.
-// `kind` is 'health' (green) or 'fury' (red).
+//
+// Colour is how the player tells the tiers apart at a glance, so each is
+// distinct and the rarer ones read as richer: white, blue, green, red, and
+// the heart in gold.
 const POTION_COLORS = {
-  health: { dark: '#2f6b34', light: '#5ac85a', glow: '#5ac85a' },
+  health_small: { dark: '#8d939c', light: '#f2f5f8', glow: '#dfe6ee' },
+  health_medium: { dark: '#1d4b8f', light: '#4d9be8', glow: '#5ab0ff' },
+  health_large: { dark: '#2f6b34', light: '#5ac85a', glow: '#5ac85a' },
   fury: { dark: '#7a1f2a', light: '#e8453f', glow: '#ff6a3d' },
+  heart: { dark: '#8a5a12', light: '#ffd54d', glow: '#ffc93d' },
+  // Boss boosts: violet for vitality, orange for power.
+  boost_hp: { dark: '#4a1f6b', light: '#a86ae0', glow: '#c08cff' },
+  boost_atk: { dark: '#7a3a0d', light: '#f0913a', glow: '#ffab4d' },
+  // Deliberately garish: shown only when a kind has no colour defined.
+  __missing: { dark: '#ff00ff', light: '#ff66ff', glow: '#ff00ff' },
 };
 
-function drawPotion(ctx, x, y, phase, kind = 'health') {
-  const c = POTION_COLORS[kind] || POTION_COLORS.health;
+// One-time report of which potion colours this build actually has, logged
+// to the browser console the first time a bottle is drawn. If the page is
+// running a stale cached sprites.js this prints the OLD, short list, which
+// is what distinguishes a caching problem from a logic one.
+let potionPaletteLogged = false;
+function logPotionPalette() {
+  if (potionPaletteLogged) return;
+  potionPaletteLogged = true;
+  const kinds = Object.keys(POTION_COLORS).filter((k) => k !== '__missing');
+  console.log('[potions] build has ' + kinds.length + ' colours: ' + kinds.join(', '));
+}
+
+function drawPotion(ctx, x, y, phase, kind = 'health_small') {
+  logPotionPalette();
+  if (!POTION_COLORS[kind]) {
+    console.warn('[potions] no colour for kind "' + kind
+      + '" -- drawing it magenta. This build is out of date.');
+  }
+  // No silent fallback to another tier's colour. A kind with no entry here
+  // is a bug (a stale cached script, a typo in a table), and quietly
+  // painting it green made exactly that failure look like working code --
+  // white and blue bottles rendering as green rather than as something
+  // obviously wrong. Magenta is not in any tier's palette, so it reads as
+  // "this is broken" at a glance.
+  const c = POTION_COLORS[kind] || POTION_COLORS.__missing;
   const bob = Math.sin(phase) * 4;
   ctx.save();
   ctx.translate(x, y + bob);
@@ -246,6 +337,19 @@ function drawPotion(ctx, x, y, phase, kind = 'health') {
   ctx.arc(0, -10, 18, 0, Math.PI * 2);
   ctx.fill();
   ctx.globalAlpha = 1;
+
+  // The extra life is not a potion at all, so it is not drawn as one: it
+  // is the same heart the HUD uses for the life count, which is what makes
+  // it read as a life rather than as another bottle to drink.
+  if (kind === 'heart') {
+    ctx.save();
+    ctx.translate(0, -12);
+    ctx.scale(1.9, 1.9);
+    drawHeart(ctx, 0, 0, 12, true);
+    ctx.restore();
+    ctx.restore();
+    return;
+  }
 
   // flask body
   ctx.fillStyle = c.dark;

@@ -30,10 +30,18 @@ Or simply open `web/index.html` directly in any modern browser.
 
 ### Run with Docker
 
+Pull the published image (no build needed):
+
+```bash
+docker run -p 8080:80 ghcr.io/pliskin92/supergereinaction:latest
+# then open http://localhost:8080
+```
+
+Or build it yourself:
+
 ```bash
 docker build -t super-gere .
 docker run -p 8080:80 super-gere
-# then open http://localhost:8080
 ```
 
 ## Controls
@@ -48,6 +56,108 @@ docker run -p 8080:80 super-gere
 | **Pause** | P |
 | **Confirm / Buy in Shop** | Enter |
 | **Leave Shop** | Escape |
+| **Call assist** (once unlocked) | U |
+| **Switch assist** | I |
+
+## Mobile
+
+The game plays on phones and tablets. Open the same URL in a mobile browser:
+an on-screen pad appears on touch devices, the canvas fills the screen, and
+in portrait the game asks to be turned (it is a wide side-scroller). Nothing
+changes on desktop — the pad is gated on `(pointer: coarse)`, so a narrow
+desktop window keeps its keyboard and its layout.
+
+It is also an installable PWA (`web/manifest.webmanifest`) — "Add to Home
+Screen" launches it fullscreen in landscape with no browser chrome.
+
+| Touch | Action |
+|---|---|
+| **D-pad** (bottom left) | Move |
+| **A** | Punch combo |
+| **B** | Roll |
+| **C** | Heavy attack |
+| **⇑** | Jump |
+| **U** (once unlocked) | Call assist |
+| **☰** (bottom centre) | Back to menu |
+
+On keyboard-driven screens (menus, the shop, a summary) the pad's A confirms
+and B goes back, rather than sending their gameplay keys — without that the
+shop could be browsed on a phone but never bought from.
+
+On menus, cutscenes and summaries the pad drives the existing keyboard
+handlers by dispatching synthetic key events, so those screens needed no
+touch-specific code (see `web/js/touch.js`).
+
+## Publishing
+
+`.github/workflows/publish.yml` builds and pushes the container image to
+**ghcr.io** on every push to `main`, for `linux/amd64` and `linux/arm64`,
+tagged `latest` and with the commit SHA. No secret to configure: it
+authenticates with the built-in `GITHUB_TOKEN`.
+
+```bash
+docker run -p 8080:80 ghcr.io/pliskin92/supergereinaction:latest
+```
+
+The package is private by default, matching the repo. To let others pull it
+without a token, open the package page on GitHub (*Packages* → this image →
+*Package settings*) and change its visibility to public.
+
+There is no GitHub Pages job: Pages on a private repo requires a paid plan.
+If a click-to-play URL is wanted later, any static host (Cloudflare Pages,
+Netlify) can serve `web/` — note the pages are written for a domain **root**
+(`<base href="/">` plus absolute links), so a host that serves from a
+subpath needs those rewritten, and `web/assets/private/` should be excluded
+from any public deploy.
+
+## Campaign
+
+**New Game** starts a six-level run. The score, the lives you have left and
+the family you have rescued carry from one level to the next; the run is
+remembered for the browser tab, so **Continue** appears on the title screen
+while one is part-played. Only finishing the whole run writes to the
+highscore table — a run abandoned partway is not recorded.
+
+Levels are described by a single table, `web/js/campaign.js`: backdrop,
+walkable band, length, roster, pack sizes, boss and who is rescued. Adding
+a level is a row there, not another copy of `level.js`.
+
+Rescuing **Mattia** (level 3) and **Michele** (level 4) unlocks them as
+assists: press **U** to call one into a fight for 20 seconds, then a
+45-second cooldown, **I** to choose which. Mattia is fast and hits often;
+Michele is slow and hits hard. They pick their own targets and cannot be
+hurt.
+
+Between levels a **shop** spends score on permanent upgrades — an extra
+life, +20 max HP, +15% damage. Points spent are gone from the final total,
+so it is a running choice between finishing and scoring.
+
+Beating the final boss does not end the run on its own: behind him is a
+locked door, and the game **prints a secret code** you are meant to write
+down. That is the end-game goal. The code is a single constant,
+`LOCK_CODE` in [web/js/lockcode.js](web/js/lockcode.js) — it ships as
+`0000`; change the digits and nothing else needs touching (any length
+works, and letters are fine).
+
+It is a keepsake, not a secret: this is a static browser game, so the code
+is in the shipped source and anyone can read it with devtools without
+playing. Do not use a code there that protects anything that matters.
+
+Each level ends with a short story scene — the rescue, and the hand-off to
+the next street — written in `web/js/interlude.js`. The dialogue is Italian
+in both languages, like the opening cutscene, because it is the family's
+voice rather than UI.
+
+Levels 2-6 are fully playable but still borrow level 1's street art, and
+share its boss. See [ART-TODO.md](ART-TODO.md) for what is missing and how
+to drop it in — every slot has a working fallback, so art can be added one
+piece at a time.
+
+To jump straight to a level while testing:
+
+```
+/level/index.html?level=4
+```
 
 ## Story & Levels
 

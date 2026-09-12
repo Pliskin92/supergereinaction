@@ -32,6 +32,11 @@ const Input = {
   held: { left: false, right: false, up: false, down: false, run: false },
   pressed: { punch: false, slide: false, heavy: false, jump: false },
 };
+// Published deliberately for the touch pad (js/touch.js), which loads last
+// and writes into exactly this object so that a thumb and a keyboard reach
+// the player through one path. A top-level `const` is script-scoped and is
+// NOT a window property, so without this the pad cannot see it.
+window.Input = Input;
 
 const keyMap = {
   ArrowLeft: 'left', a: 'left', A: 'left',

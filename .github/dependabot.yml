@@ -1,0 +1,58 @@
+# Keeps the pinned GitHub Actions up to date automatically.
+#
+# The alternative to pinning is floating -- `@master`, or a major tag like
+# `@v3` -- which sounds like it solves staleness and instead trades a
+# visible, fixable break for an invisible one: a floating ref means
+# arbitrary new code runs in CI with the repo's token, on someone else's
+# schedule, with no review. Pinned versions plus this file get currency
+# WITHOUT that, because an update arrives as a pull request you can read.
+#
+# This exists because aquasecurity/trivy-action@0.24.0 was removed upstream
+# and CI failed on every push for months with "unable to find version
+# 0.24.0" -- a pin nobody was watching. That project publishes no floating
+# tag at all (no `latest`, no `v0`), so the only options were an exact
+# version or its unreviewed master branch; the missing piece was never the
+# pin, it was the absence of anything to refresh it.
+#
+# Note that pinning does NOT make the security scanning stale: Trivy
+# downloads its vulnerability database on every run ("Need to update DB"),
+# so the CVE data is current whatever version of the action wraps it. Only
+# the wrapper is pinned.
+
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    # One PR per action rather than a single lumped update, so a change to
+    # the security scanner is reviewed on its own rather than buried among
+    # routine bumps.
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+    commit-message:
+      prefix: ci
+
+  # The base image gets the same treatment. nginx:alpine is a moving tag,
+  # so `docker build` already picks up new pushes -- but this surfaces a
+  # base-image change as a reviewable PR rather than something that
+  # silently differs between two builds of the same commit.
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+    labels:
+      - dependencies
+    commit-message:
+      prefix: docker
+
+  # The one runtime dependency (eslint) and anything added beside it.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    labels:
+      - dependencies
+    commit-message:
+      prefix: deps

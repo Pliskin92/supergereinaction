@@ -7,3 +7,7 @@ node_modules/
 # spritesheet. Only the spritesheet + atlas are used at runtime, so the
 # per-frame dumps are working files, not shipped assets.
 frames/
+
+# Headless Playwright harnesses used to drive and screenshot the game while
+# developing. Working files, not part of the shipped site.
+.devtools/

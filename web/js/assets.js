@@ -17,6 +17,9 @@ const CANONICAL_ACTIONS = [
   'idle_right', 'walk_right', 'run_right', 'jump_right',
   'punch', 'kick', 'heavy', 'roll',
   'hurt', 'hit_react', 'fall', 'victory', 'dance', 'wave',
+  // Lounging, hands behind the head. Only gere has one; it is what the
+  // opening cutscene shows him doing before he hears his father.
+  'relaxed',
 ];
 
 // giovanni's sprites have moved to web/assets/private/ and are no longer
@@ -25,7 +28,17 @@ const CANONICAL_ACTIONS = [
 // 'supergere' is not selectable: it's the FURY transformation skin that
 // Player swaps to at full meter (see PLAYER_FURY_CHARACTER), but it loads
 // through exactly the same path as any other character.
-const PlayableCharacters = ['gere', 'giox', 'minion', 'boss1', 'carla', 'supergere'];
+// 'bananana' is a second street minion. Like 'minion' it is not actually
+// selectable -- the list is really "every character pack that loads" -- but
+// it goes through the identical path, so it needs no special handling.
+// 'roger' and 'meeottee' are cutscene-only characters (Gere's father and
+// the villain, in the opening). Neither is selectable nor spawns as an
+// enemy, but they load through the identical path, which also means the
+// level's loading gate waits on them like everything else.
+const PlayableCharacters = [
+  'gere', 'giox', 'minion', 'boss1', 'carla', 'supergere', 'bananana',
+  'roger', 'meeottee',
+];
 
 // Per-character folder-name overrides. The convention is that a clip's
 // folder is named for its canonical action, but supergere's pack was
@@ -57,6 +70,13 @@ const AUTOSPRITE_CAPITALISED_CLIPS = {
 const SPRITE_FOLDER_ALIASES = {
   supergere: AUTOSPRITE_CAPITALISED_CLIPS,
   gere: AUTOSPRITE_CAPITALISED_CLIPS,
+  // bananana came from the same exporter again: capitalised clips, 'Hit
+  // React' with a space, and 'attack_right' standing in for 'heavy'. It has
+  // no roll/victory/dance/wave, which simply 404 and stay unavailable.
+  bananana: AUTOSPRITE_CAPITALISED_CLIPS,
+  // roger's and meeottee's packs came from the same exporter as gere's.
+  roger: AUTOSPRITE_CAPITALISED_CLIPS,
+  meeottee: AUTOSPRITE_CAPITALISED_CLIPS,
   // The minion's newer clips came from the same exporter, so its reaction
   // and death folders are capitalised too; its older combat clips are not.
   minion: { hurt: 'Hurt', hit_react: 'Hit React' },

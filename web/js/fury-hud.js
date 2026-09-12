@@ -217,6 +217,104 @@ class FuryPopup {
   }
 }
 
+// ---- Portrait ----
+// Gere's face in the corner of the HUD, which reacts to how the run is
+// going: it sours as health drops and goes platinum during FURY. This is
+// the same idea as Doom's status face -- state the player already has in
+// two bars, restated as an expression they read without looking.
+//
+// The art is loaded here rather than through assets.js, which is strictly
+// sprite-sheet clips (image + atlas). These are single stills with no
+// atlas, so they load as plain images.
+//
+// These are copies of the originals in assets/private, which .dockerignore
+// keeps out of the image -- a face loaded from there would 404 in the
+// deployed build while working fine locally. Anything the HUD needs at
+// runtime has to live under assets/release.
+const FACE_DIR = 'assets/release/hud/faces';
+const FACE_FILES = {
+  bigsmile: 'face_bigsmile.png',   // healthy
+  happy: 'face_happy.png',         // lightly hurt
+  smirk: 'face_smirk.png',         // hurt
+  angry: 'face_angry.png',         // badly hurt
+  platinumAngry: 'face_platinum_angry.png', // FURY
+  platinumShout: 'face_platinum_shout.png', // FURY, mid-transformation
+};
+
+const FaceImages = {};
+
+// Resolves once every face has been attempted. The level waits on this
+// before it starts, so the portrait is never drawn as an empty frame.
+// A face that fails to load individually still stays absent rather than
+// blocking the level forever -- loadImage resolves null on error.
+function loadFaces() {
+  return Promise.all(Object.entries(FACE_FILES).map(
+    ([key, file]) => loadImage(`${FACE_DIR}/${file}`).then((img) => {
+      if (img) FaceImages[key] = img;
+    }),
+  ));
+}
+
+// Health thresholds the expression changes at, as fractions of max HP.
+const FACE_HURT_AT = 0.66;
+const FACE_BAD_AT = 0.33;
+// How long after transforming the shouting face holds before settling into
+// the steady FURY glare.
+const FACE_SHOUT_FRAMES = 90;
+
+// Which face to show for the player's current state. FURY wins over health:
+// while transformed the portrait is platinum whatever the health bar says.
+function faceFor(player) {
+  if (player.furyActive) {
+    const elapsed = FURY_ACTIVE_FRAMES - player.furyTimer;
+    return elapsed < FACE_SHOUT_FRAMES ? 'platinumShout' : 'platinumAngry';
+  }
+  const pct = player.maxHp > 0 ? player.hp / player.maxHp : 0;
+  // A full meter is worth calling out even before it is spent: the player
+  // is one hit from transforming, and the smirk reads as "ready".
+  if (pct > FACE_HURT_AT) {
+    return player.fury >= FURY_MAX ? 'smirk' : 'bigsmile';
+  }
+  if (pct > FACE_BAD_AT) return 'happy';
+  return 'angry';
+}
+
+// Draws the portrait in a framed box. Returns nothing; the caller owns the
+// layout and just says where and how big.
+function drawFacePortrait(ctx, player, x, y, size) {
+  ctx.save();
+  // The frame is drawn whether or not the art loaded, so the HUD's shape
+  // does not jump around while the images are still arriving.
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  rr(ctx, x, y, size, size, 4);
+  ctx.fill();
+
+  const img = FaceImages[faceFor(player)];
+  if (img) {
+    // The stills are portrait-ish; fit them inside the square box without
+    // distorting, which keeps every expression the same scale.
+    const scale = Math.min(size / img.width, size / img.height);
+    const w = img.width * scale;
+    const h = img.height * scale;
+    ctx.drawImage(img, x + (size - w) / 2, y + (size - h) / 2, w, h);
+  }
+
+  // The frame goes gold and pulses while transformed, so FURY is legible
+  // even at a glance that misses the face itself.
+  if (player.furyActive) {
+    const pulse = 0.6 + Math.sin(Date.now() / 90) * 0.4;
+    ctx.globalAlpha = pulse;
+    ctx.strokeStyle = '#ffd54d';
+    ctx.lineWidth = 2;
+  } else {
+    ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+    ctx.lineWidth = 1;
+  }
+  rr(ctx, x, y, size, size, 4);
+  ctx.stroke();
+  ctx.restore();
+}
+
 // ---- Meter ----
 // Drawn as a labelled bar; it pulses gold while FURY is active and shows
 // the remaining seconds so the 20-second window is readable at a glance.

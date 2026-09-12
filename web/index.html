@@ -1,8 +1,11 @@
 <!doctype html>
 <html lang="it">
 <head>
+<!-- The page itself must not be cached, or a stale copy keeps
+     pointing at old ?v= script URLs and the fix never arrives. -->
+<meta http-equiv="Cache-Control" content="no-cache, must-revalidate" />
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
 <title>Super Gere: Parise Rescue</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -28,15 +31,46 @@
     height: min(94vh, 54vw);
   }
 </style>
+<link rel="manifest" href="/manifest.webmanifest" />
+<!-- iOS ignores the manifest's display/orientation, so the equivalent
+     meta tags are needed for an installed home-screen launch there. -->
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="theme-color" content="#0d0c1d" />
+<!-- iOS uses this rather than the manifest icons. -->
+<link rel="apple-touch-icon" href="/assets/release/icons/icon-192.png" />
+<link rel="stylesheet" href="/css/mobile.css?v=12" />
 </head>
 <body>
 
+<!-- Shown only on a touch device held in portrait; see css/mobile.css. The
+     game is a wide side-scroller, so it asks to be turned rather than
+     squeezing itself into a strip. -->
+<div id="rotatePrompt">
+  <div class="rotate-icon">📱</div>
+  <strong id="rotateText"></strong>
+</div>
+
 <canvas id="titleCanvas" width="480" height="270"></canvas>
 
-<script src="js/i18n.js"></script>
-<script src="js/highscores.js"></script>
-<script src="js/title.js"></script>
-<script src="js/game.js"></script>
+<script src="js/i18n.js?v=11"></script>
+<script src="js/highscores.js?v=11"></script>
+<!-- The menu offers CONTINUE when a run is part-played, so it needs the
+     run's storage helpers. -->
+<script src="js/campaign.js?v=11"></script>
+<script src="js/title.js?v=11"></script>
+<script src="js/game.js?v=11"></script>
+<!-- Touch controls. Builds the on-screen pad on coarse-pointer
+     devices and does nothing anywhere else. -->
+<script src="js/touch.js?v=12"></script>
+
+<script>
+  // The pad builds itself only on coarse-pointer devices; on desktop this
+  // is a no-op and the keyboard handlers are untouched.
+  setUpTouchControls();
+  document.getElementById('rotateText').textContent = t('rotateDevice');
+</script>
 
 </body>
 </html>
