@@ -21,12 +21,83 @@
 //
 // Bump this to invalidate every cached file. It is the one thing that must
 // change when the art does.
-const CACHE_VERSION = 'super-gere-v1';
+const CACHE_VERSION = 'super-gere-v2';
 
 // Art is matched by path rather than extension: the JSON atlases beside the
 // sheets are just as immutable and just as numerous.
 function isImmutableAsset(url) {
   return url.pathname.includes('/assets/');
+}
+
+// Pre-caches every sprite sheet the game will ever want, in the background,
+// from the worker's own install step.
+//
+// Registering early is not enough on its own: the worker takes a moment to
+// activate, and the page is already requesting art by then, so the first
+// requests can slip past its fetch handler uncached. Fetching the list here
+// means the cache is filled whether or not the page's own requests were
+// intercepted -- and on a second visit there is nothing left to fetch.
+//
+// Driven by the same generated manifest the loader uses, so it can never
+// ask for a sheet that does not exist.
+async function precacheArt() {
+  let manifest;
+  try {
+    const response = await fetch('/js/sprite-manifest.js');
+    const text = await response.text();
+    // The manifest is a JS file, not JSON: pull the object literal out of
+    // it rather than importScripts, which cannot be used after install.
+    const json = text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1);
+    manifest = JSON.parse(json);
+  } catch (err) {
+    return; // no manifest; the fetch handler still caches what is asked for
+  }
+
+  const cache = await caches.open(CACHE_VERSION);
+  // The shell: the pages and the scripts they load. Without these the art
+  // is cached but there is nothing to run it, so an offline visit fails on
+  // the very first request.
+  const pages = ['/index.html', '/level/index.html', '/arena/index.html'];
+  const urls = [...pages, '/manifest.webmanifest', '/css/mobile.css'];
+
+  // The scripts each page loads, read out of the pages themselves rather
+  // than listed here. A hardcoded list would drift the moment a file is
+  // added -- and a missing script means an offline game that loads a blank
+  // canvas, which is worse than one that does not load at all.
+  for (const page of pages) {
+    try {
+      const html = await (await fetch(page)).text();
+      const matches = html.matchAll(/src="([^"?]+)/g);
+      for (const match of matches) {
+        // Page-relative (js/foo.js) against the site root, since every page
+        // sets <base href="/">.
+        const src = match[1].startsWith('/') ? match[1] : `/${match[1]}`;
+        if (!urls.includes(src)) urls.push(src);
+      }
+    } catch (err) { /* page unreachable; its scripts stay uncached */ }
+  }
+  for (const [character, clips] of Object.entries(manifest)) {
+    for (const clip of clips) {
+      const dir = `/assets/release/${character}_sprites/${encodeURIComponent(clip)}`;
+      urls.push(`${dir}/spritesheet.png`);
+      urls.push(`${dir}/atlas.json`);
+      urls.push(`${dir}/trim.json`);
+    }
+  }
+
+  // A few at a time: firing 300 requests at once would compete with the
+  // ones the game is actually waiting on and make the first load worse
+  // rather than better.
+  const BATCH = 6;
+  for (let i = 0; i < urls.length; i += BATCH) {
+    await Promise.all(urls.slice(i, i + BATCH).map(async (url) => {
+      try {
+        if (await cache.match(url)) return; // already have it
+        const response = await fetch(url);
+        if (response && response.status === 200) await cache.put(url, response);
+      } catch (err) { /* a miss here is not fatal; the page can still fetch it */ }
+    }));
+  }
 }
 
 self.addEventListener('install', (event) => {
@@ -45,6 +116,10 @@ self.addEventListener('activate', (event) => {
       names.filter((n) => n !== CACHE_VERSION).map((n) => caches.delete(n)),
     );
     await self.clients.claim();
+    // Fill the cache in the background. Deliberately not awaited into the
+    // activate event: activation must not wait on 17MB of downloads, and
+    // the page is playable long before this finishes.
+    precacheArt();
   })());
 });
 
@@ -87,6 +162,16 @@ self.addEventListener('fetch', (event) => {
     } catch (err) {
       const hit = await cache.match(request);
       if (hit) return hit;
+      // A page is keyed by its full URL, so /level/?level=2 misses a cached
+      // /level/. The query string only tells the GAME which level to play;
+      // the document behind it is identical, so fall back to the path.
+      const bare = await cache.match(url.pathname);
+      if (bare) return bare;
+      // A directory request ('/level/') resolves to its index.
+      if (url.pathname.endsWith('/')) {
+        const index = await cache.match(`${url.pathname}index.html`);
+        if (index) return index;
+      }
       throw err;
     }
   })());

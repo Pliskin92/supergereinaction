@@ -43,6 +43,16 @@
 <!-- iOS uses this rather than the manifest icons. -->
 <link rel="apple-touch-icon" href="/assets/release/icons/icon-192.png" />
 <link rel="stylesheet" href="/css/mobile.css?v=12" />
+<!-- Registered before any art is requested. On window 'load' the worker
+     installs only after every sheet has been fetched, so the first visit
+     caches nothing; here its fetch handler is in place in time to store
+     what the game asks for. -->
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js', { scope: '/' })
+      .catch(function () { /* no cache; the game still works, just slower */ });
+  }
+</script>
 </head>
 <body>
 
@@ -87,7 +97,6 @@
 <script>
   document.getElementById('controlsHint').textContent =
     `${t('controls')} \u00b7 ${t('resetSack')}`;
-  registerArtCache();
   setUpTouchControls();
   document.getElementById('rotateText').textContent = t('rotateDevice');
 </script>

@@ -59,19 +59,3 @@ function fitCanvasToDisplay(canvas, ctx) {
   window.addEventListener('orientationchange', apply);
   return apply;
 }
-
-// Registers the service worker that caches the art (web/sw.js).
-//
-// Lives here rather than in a file of its own because every page wants it
-// and it is four lines. Failure is ignored deliberately: a browser with
-// service workers disabled, or a page opened over file://, still plays the
-// game -- it simply re-downloads the art the way it always did.
-function registerArtCache() {
-  if (!('serviceWorker' in navigator)) return;
-  window.addEventListener('load', () => {
-    // Scope '/' so one worker covers the title screen, the level and the
-    // arena rather than one per directory.
-    navigator.serviceWorker.register('/sw.js', { scope: '/' })
-      .catch(() => { /* no cache; the game still works, just slower */ });
-  });
-}
