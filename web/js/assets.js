@@ -183,22 +183,21 @@ function spriteClipExists(character, dir) {
 //
 // Listing the cast per page rather than loading the roster is the single
 // biggest thing that makes the deployed game start quickly.
-// What the level genuinely cannot start without: the player, and the first
-// thing he meets.
+// Everything a level shows. ALL of it loads before play starts.
 //
-// Split from the rest because the gate is what the player waits on. On a
-// 4Mbps connection the full cast was a 30-second wall before anything moved;
-// this is about a third of it, and the rest arrives while the player is
-// already walking down the street. The boss is a minute away and supergere
-// is not reachable until the FURY meter fills, so neither needs to be in
-// before the game starts.
-const LEVEL_CHARACTERS = ['gere', 'minion'];
-// Loaded immediately after, in the background: the tougher minion, the
-// boss, and the transformation skin. Any of these missing simply means that
-// character falls back to procedural drawing for the seconds before it
-// arrives -- which is the existing behaviour for a missing clip, not a new
-// failure mode.
-const LEVEL_DEFERRED_CHARACTERS = ['bananana', 'boss1', 'supergere'];
+// Streaming art in during play was tried and is worse than the wait it
+// saves: a boss that pops in mid-approach, an animation that hitches the
+// first time it plays, a transformation that arrives as a stick figure.
+// A game that stutters is worse than a game that takes a moment to open,
+// so the loading screen holds until every sheet this level needs is in
+// memory -- and the service worker means that happens once per device, not
+// once per visit.
+const LEVEL_CHARACTERS = [
+  // The player, and the skin he transforms into.
+  'gere', 'supergere',
+  // The street, and the boss at the end of it.
+  'minion', 'bananana', 'boss1',
+];
 // The cutscene and story-scene cast. Deliberately NOT in the gate above:
 // roger and meeottee are ~17MB of sheets between them, and holding the
 // level's start on art that only the opening cutscene uses is most of what
@@ -229,19 +228,22 @@ const STORY_CLIPS = [
   'idle_right', 'walk_right', 'run_right',
   'punch', 'heavy', 'hurt', 'fall', 'victory', 'relaxed',
 ];
-// The cutscene's opening beats: the two of them squared up and talking,
-// before a blow is thrown. Everything else in STORY_CLIPS belongs to the
-// fight, the fall and Gere's half, which are seconds away and load while
-// the first lines are being read.
-//
-// This is what the opening of level 1 waits on, and it is two clips rather
-// than fifteen sheets.
-const STORY_OPENING_CLIPS = ['idle_right', 'punch'];
+
+
+// Called once per sheet as it lands, so a caller can drive a real progress
+// bar. Set by the page; ignored when absent.
+let onSpriteLoaded = null;
+function setSpriteProgressCallback(fn) {
+  onSpriteLoaded = fn;
+}
 
 // Loads the sheets for a named cast. `characters` is a list of character
 // keys; `props` a list of prop-pack keys; `clips` restricts which actions
 // are fetched. Omitting them loads everything, which is what an unknown
 // caller should get.
+//
+// Returns a promise that also carries `count`: how many sheets it is
+// fetching, so the caller can size a progress bar before any arrive.
 function loadAssets(characters = null, props = null, clips = null) {
   const sheetPromises = [];
   const packs = {};
@@ -261,10 +263,17 @@ function loadAssets(characters = null, props = null, clips = null) {
       // a prop's single clip IS its gameplay clip.
       if (clips && CharacterSpriteSheets[character] && !clips.includes(action)) continue;
       if (!spriteClipExists(character, dir)) continue;
-      sheetPromises.push(loadSpriteSheet(character, action, dir));
+      sheetPromises.push(
+        loadSpriteSheet(character, action, dir).then((r) => {
+          if (onSpriteLoaded) onSpriteLoaded();
+          return r;
+        }),
+      );
     }
   }
-  return Promise.all(sheetPromises);
+  const all = Promise.all(sheetPromises);
+  all.count = sheetPromises.length;
+  return all;
 }
 
 // Returns the frame closest to `t` (0..1 normalized progress through the

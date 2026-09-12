@@ -357,6 +357,12 @@ let runFrames = 0;
 // point is that the player never sees a half-loaded frame -- a procedurally
 // drawn stick-figure Gere, or an empty portrait box -- in place of the art.
 let assetsReady = false;
+// Real loading progress, for the bar on the loading screen. `total` is how
+// many load jobs there are and `done` how many have resolved -- honest
+// progress rather than the marquee that used to stand in for it, which
+// mattered less when the wait was short and matters now that every sheet
+// the level shows is gating.
+const loadProgress = { done: 0, total: 0 };
 
 // The opening cutscene. Runs once, after the loading gate opens and before
 // gameplay starts; `introDone` is what hands control over. Skipped entirely
@@ -1192,21 +1198,28 @@ function drawLoading() {
   ctx.fillStyle = '#ffd54d';
   ctx.fillText(t('loading'), W / 2, H / 2 - 14);
 
-  // A marquee rather than a percentage: loadAssets() resolves as a whole,
-  // so there is no honest per-file progress to report and a fake bar would
-  // be worse than none.
-  const barW = 200;
-  const barH = 6;
+  // A real bar: the load is split into counted jobs, so there is honest
+  // progress to show. It matters more than it used to -- every sheet the
+  // level will show is loaded before play starts, so this is the whole
+  // wait, and a player watching it should be able to see it moving.
+  const barW = 240;
+  const barH = 8;
   const x = (W - barW) / 2;
   const y = H / 2 + 12;
   ctx.fillStyle = 'rgba(255,255,255,0.12)';
-  rr(ctx, x, y, barW, barH, 3);
+  rr(ctx, x, y, barW, barH, 4);
   ctx.fill();
-  const sweep = (Date.now() / 6) % (barW + 60) - 60;
+  const frac = loadProgress.total
+    ? clamp(loadProgress.done / loadProgress.total, 0, 1)
+    : 0;
   ctx.fillStyle = '#00f5d4';
-  rr(ctx, x + Math.max(0, sweep), y,
-    Math.min(60, barW - Math.max(0, sweep), sweep + 60), barH, 3);
+  rr(ctx, x, y, Math.max(barH, barW * frac), barH, 4);
   ctx.fill();
+  // The count, under the bar. A long first load is much easier to wait
+  // through when it visibly advances.
+  ctx.font = 'bold 10px monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.65)';
+  ctx.fillText(`${Math.round(frac * 100)}%`, W / 2, y + barH + 14);
   ctx.restore();
 }
 
@@ -1437,72 +1450,58 @@ function levelSetUp() {
   // the player is already walking; until a pack arrives its character
   // simply falls back to procedural drawing, which is what a missing clip
   // has always done.
-  // Deferred art is not merely un-awaited -- it is not REQUESTED until the
-  // gate opens.
-  //
-  // Starting the requests early and simply not waiting on them does not
-  // help: every request shares one connection, so the deferred sheets
-  // compete with the gating ones for the same bandwidth and all of them
-  // finish at roughly the same time. Measured on a 4Mbps link, that was the
-  // difference between a 27-second wait and a 9-second one. The queue has
-  // to be held back, not just the promise.
-  const startDeferredArt = () => {
-    loadAssets(LEVEL_DEFERRED_CHARACTERS, [], GAMEPLAY_CLIPS);
-    loadAssets(STORY_CHARACTERS, [], STORY_CLIPS);
-  };
-  // Level 1 opens on the cutscene, so its cast IS gating there and has to be
-  // requested up front. Every other level requests it only once play has
-  // started, alongside the rest of the deferred art.
   const opensOnCutscene = levelIndex === 0 && !introAlreadySeen();
-  const storyArt = opensOnCutscene
-    ? Promise.all([
-      // Only what the opening beats show. The rest of the cutscene's clips
-      // are fetched by startDeferredArt() once it is on screen -- the fight
-      // is a good fifteen seconds of dialogue away, which is ample time on
-      // any connection that can play the game at all.
-      loadAssets(['roger', 'meeottee'], [], STORY_OPENING_CLIPS),
-      loadIntroBackgrounds(),
-    ])
-    : Promise.resolve();
 
-  Promise.all([
-    // Only the cast this level actually shows. Loading the whole roster
-    // meant waiting on ~12MB of arena-only art before play could start.
+  // EVERYTHING this level shows is loaded before play starts. Nothing
+  // streams in behind the game.
+  //
+  // The alternative was tried: gate on the player and the first minion,
+  // fetch the boss and the transformation skin during play. It halves the
+  // wait and ruins the game -- the boss pops in mid-approach, a clip
+  // hitches the first time it plays, FURY arrives as a stick figure. A
+  // moment on a loading screen is worth far more than a fight that
+  // stutters.
+  //
+  // The cost is paid once per device, not once per visit: the service
+  // worker (web/sw.js) keeps the art on disk, so this wait happens on the
+  // first play and effectively never again.
+  const jobs = [
     loadAssets(LEVEL_CHARACTERS, [], GAMEPLAY_CLIPS),
     loadFaces(),
-    // The level's own splash art for the card, when its row declares any.
     loadLevelCardArt(level),
     loadImage(LEVEL_BACKGROUND).then((img) => {
       if (!img) return;
       background = img;
       layoutLevel(img);
     }),
-  ]).then(() => {
-    // Whether this run opens on the cutscene. Decided BEFORE assetsReady so
-    // the gate can be held for it: the cutscene's cast loads off the gate,
-    // and letting the level become playable first would hand the player a
-    // second or two of control before the scene snapped in over the top.
-    if (opensOnCutscene) {
-      try { sessionStorage.setItem(INTRO_SEEN_KEY, '1'); } catch (e) { /* session-only */ }
-      storyArt.then(() => {
-        intro = new IntroScene(W, H);
-        levelCard = new LevelCard(W, H, level, levelIndex + 1);
-        assetsReady = true;
-        // Now that the player has something to look at, fetch the rest.
-        startDeferredArt();
-      });
-      return;
-    }
+  ];
+  // The cutscene's cast and backdrops, when this run opens on it. Also
+  // gating: a cutscene that plays with half its characters missing is the
+  // same failure as a fight that does.
+  if (opensOnCutscene) {
+    jobs.push(loadAssets(STORY_CHARACTERS, [], STORY_CLIPS));
+    jobs.push(loadIntroBackgrounds());
+  }
+
+  // Drive the loading bar off individual SHEETS, not off the handful of
+  // top-level jobs: at six jobs the bar sat at 0% for most of the wait and
+  // then jumped, which reads as a hang. Every sheet ticks it forward.
+  loadProgress.total = jobs.reduce((n, job) => n + (job.count || 1), 0);
+  setSpriteProgressCallback(() => { loadProgress.done++; });
+  // The non-sprite jobs (faces, backdrops, card art) each count as one.
+  jobs.filter((job) => !job.count).forEach((job) => {
+    job.then(() => { loadProgress.done++; });
+  });
+
+  Promise.all(jobs).then(() => {
     // layoutLevel() has run by now, so the world is laid out and the boss
     // placed; runFrames was reset there, so the clock starts here.
-    assetsReady = true;
-    // The cutscene is handled above: it plays once per session, on level 1
-    // only, and holds the gate because its cast loads off it.
-    // Every level gets a card, cutscene or not. It is created here rather
-    // than when the cutscene ends because update() simply waits for the
-    // cutscene to be done before ticking it.
+    if (opensOnCutscene) {
+      try { sessionStorage.setItem(INTRO_SEEN_KEY, '1'); } catch (e) { /* session-only */ }
+      intro = new IntroScene(W, H);
+    }
     levelCard = new LevelCard(W, H, level, levelIndex + 1);
-    startDeferredArt();
+    assetsReady = true;
   });
 }
 
