@@ -62,7 +62,7 @@ jobs:
         run: git fetch --prune --unshallow || true
 
       - name: Scan for leaked secrets
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
