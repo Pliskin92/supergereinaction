@@ -62,7 +62,7 @@ jobs:
 
       - name: Tag the image
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ${{ steps.name.outputs.image }}
           # `latest` tracks main ONLY -- a branch build must never replace
