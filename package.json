@@ -5,9 +5,15 @@
   "description": "Super Gere: Parise Rescue - a 2D side-scrolling beat-em-up",
   "scripts": {
     "lint": "eslint web/js && npm run lint:bundle",
-    "lint:bundle": "node scripts/build-lint-bundle.js && eslint .lint-bundle"
+    "lint:bundle": "node scripts/build-lint-bundle.js && eslint .lint-bundle",
+    "android:add": "cap add android",
+    "android:sync": "cap sync android",
+    "android:build": "npm run android:sync && cd android && ./gradlew bundleRelease"
   },
   "devDependencies": {
+    "@capacitor/android": "^8.0.0",
+    "@capacitor/cli": "^8.0.0",
+    "@capacitor/core": "^8.0.0",
     "eslint": "^10.9.0"
   }
 }

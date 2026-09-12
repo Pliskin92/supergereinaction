@@ -21,7 +21,18 @@
 //
 // Bump this to invalidate every cached file. It is the one thing that must
 // change when the art does.
-const CACHE_VERSION = 'super-gere-v2';
+const CACHE_VERSION = 'super-gere-v3';
+
+// Keep the runnable shell separate from the large, best-effort art preload.
+// Installation must complete only when a cached page can load its scripts
+// offline; artwork can continue filling in after activation.
+const APP_SHELL = [
+  '/index.html',
+  '/level/index.html',
+  '/arena/index.html',
+  '/manifest.webmanifest',
+  '/css/mobile.css',
+];
 
 // Art is matched by path rather than extension: the JSON atlases beside the
 // sheets are just as immutable and just as numerous.
@@ -70,8 +81,8 @@ async function precacheArt() {
       const matches = html.matchAll(/src="([^"?]+)/g);
       for (const match of matches) {
         // Page-relative (js/foo.js) against the site root, since every page
-        // sets <base href="/">.
-        const src = match[1].startsWith('/') ? match[1] : `/${match[1]}`;
+  const pages = ['/index.html', '/level/index.html', '/arena/index.html'];
+  const urls = [...APP_SHELL];
         if (!urls.includes(src)) urls.push(src);
       }
     } catch (err) { /* page unreachable; its scripts stay uncached */ }
@@ -117,7 +128,11 @@ self.addEventListener('activate', (event) => {
     );
     await self.clients.claim();
     // Fill the cache in the background. Deliberately not awaited into the
-    // activate event: activation must not wait on 17MB of downloads, and
+  event.waitUntil((async () => {
+    const cache = await caches.open(CACHE_VERSION);
+    await cache.addAll(APP_SHELL);
+    await self.skipWaiting();
+  })());
     // the page is playable long before this finishes.
     precacheArt();
   })());

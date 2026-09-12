@@ -1,0 +1,8 @@
+{
+  "appId": "com.supergere.pariserescue",
+  "appName": "Super Gere: Parise Rescue",
+  "webDir": "web",
+  "android": {
+    "allowMixedContent": false
+  }
+}

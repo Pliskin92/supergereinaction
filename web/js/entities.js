@@ -54,13 +54,29 @@ function drawGroundShadow(ctx, sx, y, spriteWidth) {
 //
 // The caller is expected to have already translated to the character's
 // feet and applied any facing flip.
+// How much larger than its stored pixels a sprite is drawn.
+//
+// The sheets are shipped downscaled (scripts/downscale-sprites.py) because
+// they were authored far larger than anything displays them, and the art was
+// 14.8MB the player waited on. Drawing them at their stored size would then
+// shrink every character on screen, so this puts the size back: the transfer
+// is smaller, the game looks the same.
+//
+// It is the reciprocal of the scale the script used. Change one and you must
+// change the other -- which is why the number is named here rather than
+// written into a draw call.
+const SPRITE_SOURCE_SCALE = 1 / 0.625;
+
 function drawSpriteFrame(ctx, frame, liftScale = 1) {
-  const dx = frame.offsetX || 0;
-  const lift = (frame.lift || 0) * liftScale;
+  const k = SPRITE_SOURCE_SCALE;
+  const dx = (frame.offsetX || 0) * k;
+  const lift = (frame.lift || 0) * liftScale * k;
+  const w = frame.sw * k;
+  const h = frame.sh * k;
   ctx.drawImage(
     frame.image,
     frame.sx, frame.sy, frame.sw, frame.sh,
-    dx - frame.sw / 2, -frame.sh - lift, frame.sw, frame.sh
+    dx - w / 2, -h - lift, w, h
   );
 }
 
