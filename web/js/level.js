@@ -1415,12 +1415,22 @@ function levelSetUp() {
   // The loop starts immediately so the loading screen animates, but
   // update()/draw() stay gated on assetsReady until everything is in.
   loop();
-  Promise.all([
-    loadAssets(),
-    loadFaces(),
-    // The cutscene's still backdrop. Gated like everything else so the
-    // intro never draws a frame with its background missing.
+  // The story cast (roger, meeottee, carla) is ~18MB of sheets and is only
+  // ever seen in the cutscene and the between-level scenes. It loads
+  // alongside the gameplay art but is NOT part of the gate below, so the
+  // street is playable as soon as the street's own art is in. Whoever
+  // needs it waits on this promise instead.
+  const storyArt = Promise.all([
+    loadAssets(STORY_CHARACTERS, []),
+    // The cutscene's still backdrops go with its cast, for the same reason.
     loadIntroBackgrounds(),
+  ]);
+
+  Promise.all([
+    // Only the cast this level actually shows. Loading the whole roster
+    // meant waiting on ~12MB of arena-only art before play could start.
+    loadAssets(LEVEL_CHARACTERS, []),
+    loadFaces(),
     // The level's own splash art for the card, when its row declares any.
     loadLevelCardArt(level),
     loadImage(LEVEL_BACKGROUND).then((img) => {
@@ -1429,23 +1439,32 @@ function levelSetUp() {
       layoutLevel(img);
     }),
   ]).then(() => {
+    // Whether this run opens on the cutscene. Decided BEFORE assetsReady so
+    // the gate can be held for it: the cutscene's cast loads off the gate,
+    // and letting the level become playable first would hand the player a
+    // second or two of control before the scene snapped in over the top.
+    let playsIntro = false;
+    if (levelIndex === 0) {
+      try {
+        playsIntro = sessionStorage.getItem(INTRO_SEEN_KEY) !== '1';
+      } catch (e) { /* storage blocked; treat as not yet seen */
+        playsIntro = true;
+      }
+    }
+    if (playsIntro) {
+      try { sessionStorage.setItem(INTRO_SEEN_KEY, '1'); } catch (e) { /* session-only */ }
+      storyArt.then(() => {
+        intro = new IntroScene(W, H);
+        levelCard = new LevelCard(W, H, level, levelIndex + 1);
+        assetsReady = true;
+      });
+      return;
+    }
     // layoutLevel() has run by now, so the world is laid out and the boss
     // placed; runFrames was reset there, so the clock starts here.
     assetsReady = true;
-    // The cutscene plays once per session. Retrying after a game over
-    // reloads the page, so this is remembered outside it.
-    // The opening cutscene is level 1's -- it is how the run starts, so it
-    // does not play in front of levels 2-6. Within level 1 it is still
-    // remembered for the tab, so retrying after a game over does not mean
-    // sitting through it again.
-    if (levelIndex === 0) {
-      let seen = false;
-      try { seen = sessionStorage.getItem(INTRO_SEEN_KEY) === '1'; } catch (e) { /* storage blocked */ }
-      if (!seen) {
-        intro = new IntroScene(W, H);
-        try { sessionStorage.setItem(INTRO_SEEN_KEY, '1'); } catch (e) { /* session-only */ }
-      }
-    }
+    // The cutscene is handled above: it plays once per session, on level 1
+    // only, and holds the gate because its cast loads off it.
     // Every level gets a card, cutscene or not. It is created here rather
     // than when the cutscene ends because update() simply waits for the
     // cutscene to be done before ticking it.

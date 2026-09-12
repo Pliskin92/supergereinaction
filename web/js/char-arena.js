@@ -329,7 +329,7 @@ function arenaSetUp() {
     requestAnimationFrame(spin);
   })();
 
-  Promise.all([loadAssets(), loadStages()]).then(() => {
+  Promise.all([loadAssets(ARENA_CHARACTERS, ARENA_PROPS), loadStages()]).then(() => {
     ready = true;
     drawLoadingScreen(1);
     selectStage(stageId);

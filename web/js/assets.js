@@ -173,9 +173,48 @@ function spriteClipExists(character, dir) {
   return clips.includes(clip);
 }
 
-function loadAssets() {
+// Who each page actually needs.
+//
+// The packs total 17MB across 102 sheets, and the loading gate waits for
+// every one before the game starts. Most of that is not used by the page
+// waiting on it: the level was downloading giox (11.4MB, arena-only), the
+// boxing sack and the bonus-stage car before it would let anyone play --
+// roughly 12MB of the 17 spent on art that never appears.
+//
+// Listing the cast per page rather than loading the roster is the single
+// biggest thing that makes the deployed game start quickly.
+// What the level cannot start without: the player and whoever he fights.
+const LEVEL_CHARACTERS = [
+  // The player, and the skin he transforms into.
+  'gere', 'supergere',
+  // The street, and the boss at the end of it.
+  'minion', 'bananana', 'boss1',
+];
+// The cutscene and story-scene cast. Deliberately NOT in the gate above:
+// roger and meeottee are ~17MB of sheets between them, and holding the
+// level's start on art that only the opening cutscene uses is most of what
+// made the deployed game take eight seconds to become playable. These load
+// in the background and the cutscene waits for them itself.
+const STORY_CHARACTERS = ['roger', 'meeottee', 'carla'];
+const ARENA_CHARACTERS = ['gere', 'supergere', 'giox', 'minion', 'boss1'];
+const ARENA_PROPS = ['boxingsack', 'car'];
+
+// Loads the sheets for a named cast. `characters` is a list of character
+// keys; `props` a list of prop-pack keys. Omitting both loads everything,
+// which is what an unknown caller should get.
+function loadAssets(characters = null, props = null) {
   const sheetPromises = [];
-  const packs = { ...CharacterSpriteSheets, ...PropSpriteSheets };
+  const packs = {};
+  const wantChars = characters || Object.keys(CharacterSpriteSheets);
+  for (const character of wantChars) {
+    if (CharacterSpriteSheets[character]) {
+      packs[character] = CharacterSpriteSheets[character];
+    }
+  }
+  const wantProps = props || Object.keys(PropSpriteSheets);
+  for (const prop of wantProps) {
+    if (PropSpriteSheets[prop]) packs[prop] = PropSpriteSheets[prop];
+  }
   for (const [character, actions] of Object.entries(packs)) {
     for (const [action, dir] of Object.entries(actions)) {
       if (!spriteClipExists(character, dir)) continue;
