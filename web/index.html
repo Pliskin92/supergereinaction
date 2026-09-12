@@ -71,6 +71,7 @@
 <script>
   // The pad builds itself only on coarse-pointer devices; on desktop this
   // is a no-op and the keyboard handlers are untouched.
+  registerArtCache();
   setUpTouchControls();
   document.getElementById('rotateText').textContent = t('rotateDevice');
 </script>

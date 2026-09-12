@@ -19,6 +19,11 @@ FROM nginx:alpine
 # upgraded packages themselves.
 RUN apk upgrade --no-cache
 
+# Serving rules: long-lived caching for art, no caching for the pages.
+# Without this nginx sends `cache-control: private` on everything and the
+# browser revalidates all 102 spritesheets on every visit.
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
 COPY web/ /usr/share/nginx/html/
 
 EXPOSE 80

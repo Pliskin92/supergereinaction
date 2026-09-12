@@ -183,13 +183,22 @@ function spriteClipExists(character, dir) {
 //
 // Listing the cast per page rather than loading the roster is the single
 // biggest thing that makes the deployed game start quickly.
-// What the level cannot start without: the player and whoever he fights.
-const LEVEL_CHARACTERS = [
-  // The player, and the skin he transforms into.
-  'gere', 'supergere',
-  // The street, and the boss at the end of it.
-  'minion', 'bananana', 'boss1',
-];
+// What the level genuinely cannot start without: the player, and the first
+// thing he meets.
+//
+// Split from the rest because the gate is what the player waits on. On a
+// 4Mbps connection the full cast was a 30-second wall before anything moved;
+// this is about a third of it, and the rest arrives while the player is
+// already walking down the street. The boss is a minute away and supergere
+// is not reachable until the FURY meter fills, so neither needs to be in
+// before the game starts.
+const LEVEL_CHARACTERS = ['gere', 'minion'];
+// Loaded immediately after, in the background: the tougher minion, the
+// boss, and the transformation skin. Any of these missing simply means that
+// character falls back to procedural drawing for the seconds before it
+// arrives -- which is the existing behaviour for a missing clip, not a new
+// failure mode.
+const LEVEL_DEFERRED_CHARACTERS = ['bananana', 'boss1', 'supergere'];
 // The cutscene and story-scene cast. Deliberately NOT in the gate above:
 // roger and meeottee are ~17MB of sheets between them, and holding the
 // level's start on art that only the opening cutscene uses is most of what
@@ -199,10 +208,41 @@ const STORY_CHARACTERS = ['roger', 'meeottee', 'carla'];
 const ARENA_CHARACTERS = ['gere', 'supergere', 'giox', 'minion', 'boss1'];
 const ARENA_PROPS = ['boxingsack', 'car'];
 
+// The clips gameplay actually draws.
+//
+// PLAYER_ANIM_MAP and the EnemyTypes maps between them reference ten clips;
+// the canonical action list is longer because it also covers cosmetics
+// (dance, victory, wave, relaxed) and reaction clips the level never plays.
+// Those are whole spritesheets -- 100-300KB each -- downloaded before the
+// game would start, for poses nobody sees during a fight.
+//
+// The cutscene and the story scenes DO use some of them, which is why this
+// is a per-call filter rather than a change to CANONICAL_ACTIONS: the story
+// cast loads with its own list (see STORY_CLIPS).
+const GAMEPLAY_CLIPS = [
+  'idle_right', 'walk_right', 'run_right', 'jump_right',
+  'punch', 'kick', 'heavy', 'roll', 'hurt', 'fall',
+];
+// What the cutscene and the between-level scenes stage. drawIntroCharacter
+// maps its poses onto these.
+const STORY_CLIPS = [
+  'idle_right', 'walk_right', 'run_right',
+  'punch', 'heavy', 'hurt', 'fall', 'victory', 'relaxed',
+];
+// The cutscene's opening beats: the two of them squared up and talking,
+// before a blow is thrown. Everything else in STORY_CLIPS belongs to the
+// fight, the fall and Gere's half, which are seconds away and load while
+// the first lines are being read.
+//
+// This is what the opening of level 1 waits on, and it is two clips rather
+// than fifteen sheets.
+const STORY_OPENING_CLIPS = ['idle_right', 'punch'];
+
 // Loads the sheets for a named cast. `characters` is a list of character
-// keys; `props` a list of prop-pack keys. Omitting both loads everything,
-// which is what an unknown caller should get.
-function loadAssets(characters = null, props = null) {
+// keys; `props` a list of prop-pack keys; `clips` restricts which actions
+// are fetched. Omitting them loads everything, which is what an unknown
+// caller should get.
+function loadAssets(characters = null, props = null, clips = null) {
   const sheetPromises = [];
   const packs = {};
   const wantChars = characters || Object.keys(CharacterSpriteSheets);
@@ -217,6 +257,9 @@ function loadAssets(characters = null, props = null) {
   }
   for (const [character, actions] of Object.entries(packs)) {
     for (const [action, dir] of Object.entries(actions)) {
+      // Props declare only the clips they have, so they are never filtered:
+      // a prop's single clip IS its gameplay clip.
+      if (clips && CharacterSpriteSheets[character] && !clips.includes(action)) continue;
       if (!spriteClipExists(character, dir)) continue;
       sheetPromises.push(loadSpriteSheet(character, action, dir));
     }

@@ -90,6 +90,7 @@
   // is a no-op and the keyboard handlers are untouched.
   // `assists` gates the U button: it is only built once the run has
   // unlocked an uncle to call.
+  registerArtCache();
   setUpTouchControls({ assists: typeof assists !== 'undefined' && assists.available });
   document.getElementById('rotateText').textContent = t('rotateDevice');
 </script>

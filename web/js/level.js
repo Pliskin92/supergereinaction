@@ -1411,6 +1411,19 @@ window.touchState = () => ({
   gameOver: !!(player && player.gameOver),
 });
 
+// Whether the opening cutscene has already played in this tab.
+//
+// Read in two places -- deciding whether to request the cutscene's cast up
+// front, and deciding whether to play it -- which must agree, so it is one
+// function rather than two copies of a try/catch.
+function introAlreadySeen() {
+  try {
+    return sessionStorage.getItem(INTRO_SEEN_KEY) === '1';
+  } catch (e) {
+    return false; // storage blocked; treat as not yet seen
+  }
+}
+
 function levelSetUp() {
   // The loop starts immediately so the loading screen animates, but
   // update()/draw() stay gated on assetsReady until everything is in.
@@ -1420,16 +1433,42 @@ function levelSetUp() {
   // alongside the gameplay art but is NOT part of the gate below, so the
   // street is playable as soon as the street's own art is in. Whoever
   // needs it waits on this promise instead.
-  const storyArt = Promise.all([
-    loadAssets(STORY_CHARACTERS, []),
-    // The cutscene's still backdrops go with its cast, for the same reason.
-    loadIntroBackgrounds(),
-  ]);
+  // Everything that is not needed to take the first step. It loads while
+  // the player is already walking; until a pack arrives its character
+  // simply falls back to procedural drawing, which is what a missing clip
+  // has always done.
+  // Deferred art is not merely un-awaited -- it is not REQUESTED until the
+  // gate opens.
+  //
+  // Starting the requests early and simply not waiting on them does not
+  // help: every request shares one connection, so the deferred sheets
+  // compete with the gating ones for the same bandwidth and all of them
+  // finish at roughly the same time. Measured on a 4Mbps link, that was the
+  // difference between a 27-second wait and a 9-second one. The queue has
+  // to be held back, not just the promise.
+  const startDeferredArt = () => {
+    loadAssets(LEVEL_DEFERRED_CHARACTERS, [], GAMEPLAY_CLIPS);
+    loadAssets(STORY_CHARACTERS, [], STORY_CLIPS);
+  };
+  // Level 1 opens on the cutscene, so its cast IS gating there and has to be
+  // requested up front. Every other level requests it only once play has
+  // started, alongside the rest of the deferred art.
+  const opensOnCutscene = levelIndex === 0 && !introAlreadySeen();
+  const storyArt = opensOnCutscene
+    ? Promise.all([
+      // Only what the opening beats show. The rest of the cutscene's clips
+      // are fetched by startDeferredArt() once it is on screen -- the fight
+      // is a good fifteen seconds of dialogue away, which is ample time on
+      // any connection that can play the game at all.
+      loadAssets(['roger', 'meeottee'], [], STORY_OPENING_CLIPS),
+      loadIntroBackgrounds(),
+    ])
+    : Promise.resolve();
 
   Promise.all([
     // Only the cast this level actually shows. Loading the whole roster
     // meant waiting on ~12MB of arena-only art before play could start.
-    loadAssets(LEVEL_CHARACTERS, []),
+    loadAssets(LEVEL_CHARACTERS, [], GAMEPLAY_CLIPS),
     loadFaces(),
     // The level's own splash art for the card, when its row declares any.
     loadLevelCardArt(level),
@@ -1443,20 +1482,14 @@ function levelSetUp() {
     // the gate can be held for it: the cutscene's cast loads off the gate,
     // and letting the level become playable first would hand the player a
     // second or two of control before the scene snapped in over the top.
-    let playsIntro = false;
-    if (levelIndex === 0) {
-      try {
-        playsIntro = sessionStorage.getItem(INTRO_SEEN_KEY) !== '1';
-      } catch (e) { /* storage blocked; treat as not yet seen */
-        playsIntro = true;
-      }
-    }
-    if (playsIntro) {
+    if (opensOnCutscene) {
       try { sessionStorage.setItem(INTRO_SEEN_KEY, '1'); } catch (e) { /* session-only */ }
       storyArt.then(() => {
         intro = new IntroScene(W, H);
         levelCard = new LevelCard(W, H, level, levelIndex + 1);
         assetsReady = true;
+        // Now that the player has something to look at, fetch the rest.
+        startDeferredArt();
       });
       return;
     }
@@ -1469,6 +1502,7 @@ function levelSetUp() {
     // than when the cutscene ends because update() simply waits for the
     // cutscene to be done before ticking it.
     levelCard = new LevelCard(W, H, level, levelIndex + 1);
+    startDeferredArt();
   });
 }
 
