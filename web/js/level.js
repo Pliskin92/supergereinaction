@@ -1466,7 +1466,15 @@ function levelSetUp() {
   // worker (web/sw.js) keeps the art on disk, so this wait happens on the
   // first play and effectively never again.
   const jobs = [
-    loadAssets(LEVEL_CHARACTERS, [], GAMEPLAY_CLIPS),
+    // GAMEPLAY_CLIPS plus whatever the story scenes stage, because gere and
+    // supergere appear in BOTH: the cutscene lounges him in 'relaxed' and
+    // runs him off in 'run_right', and filtering him to gameplay clips
+    // alone dropped 'relaxed' entirely -- which is why he rendered as the
+    // vector stick figure in the opening scene.
+    loadAssets(
+      LEVEL_CHARACTERS, [],
+      [...new Set([...GAMEPLAY_CLIPS, ...STORY_CLIPS])],
+    ),
     loadFaces(),
     loadLevelCardArt(level),
     loadImage(LEVEL_BACKGROUND).then((img) => {
