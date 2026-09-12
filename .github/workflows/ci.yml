@@ -110,6 +110,15 @@ jobs:
       - name: Build Docker image
         run: docker build -t super-gere:${{ github.sha }} .
 
+      # Pinned, not floating. trivy-action publishes no floating tag (no
+      # `latest`, no `v0`), so the only alternative is its unreviewed
+      # `master` branch -- arbitrary new code running in CI with the repo's
+      # token. .github/dependabot.yml keeps this current by pull request
+      # instead.
+      #
+      # This does not make the scan stale: Trivy downloads its vulnerability
+      # database on every run, so the CVE data is current whatever version
+      # of the wrapper action is pinned here.
       - name: Scan image with Trivy
         uses: aquasecurity/trivy-action@v0.36.0
         with:
