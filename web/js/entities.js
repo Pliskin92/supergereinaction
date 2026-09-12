@@ -89,6 +89,11 @@ const PUNCH_STRIKE_TICK = Math.round(PUNCH_CLIP_TICKS * 0.6);
 // actually reaching its contact frame.
 const PUNCH_BUFFER_FRAMES = PUNCH_CLIP_TICKS;
 const PLAYER_SLIDE_DURATION = 28;
+// How long a roll press is remembered while one is already playing. A
+// little longer than the roll itself, so a press at any point during one
+// still chains rather than being dropped -- which is what "spam the button
+// and get a continuous roll" requires.
+const SLIDE_BUFFER_FRAMES = PLAYER_SLIDE_DURATION;
 
 // ---- FURY meter / Super Gere transformation ----
 // Fills 1% per hit, landed or received, regardless of the attack's weight
@@ -430,6 +435,10 @@ class Player {
     this.lastHitTick = -999;
     this.animTimer = 0; // frames elapsed in the current action, for sprite-sheet playback
     this.prevAction = 'idle';
+    // Roll press remembered while the current roll is still playing, so a
+    // mashed button chains rolls instead of restarting one. Counts down for
+    // the same reason punchBuffer does.
+    this.slideBuffer = 0;
     // Punch press remembered while the current punch is still winding up;
     // counts down so a press long past the swing doesn't fire spuriously.
     this.punchBuffer = 0;
@@ -537,16 +546,36 @@ class Player {
     if (this.hitStun > 0) return;
     if (!this.hasAction('slide')) return;
     if (this.moveTimer > 0 && this.action !== 'slide') return;
-    // Re-triggering while already sliding keeps the same action string, so
-    // update()'s action !== prevAction check never fires — reset animTimer
-    // explicitly or the sprite frame stays pinned wherever it was.
+    // A press DURING a roll queues the next one instead of restarting this
+    // one.
+    //
+    // It used to reset animTimer on every press, which meant mashing the
+    // button replayed the first frames forever: measured, animTimer never
+    // got past 5 of the clip's 28, so the roll visibly never completed and
+    // the player saw the same opening pose over and over. Buffering it
+    // instead means a held or mashed button reads as a CONTINUOUS roll --
+    // each one plays out in full and the next begins as it ends.
+    if (this.action === 'slide' && this.moveTimer > 0) {
+      this.slideBuffer = SLIDE_BUFFER_FRAMES;
+      return;
+    }
+    this.beginSlide();
+  }
+
+  // The roll itself, split out so both a fresh press and a buffered one
+  // start it identically.
+  beginSlide() {
     this.action = 'slide';
+    // Re-triggering keeps the same action string, so update()'s
+    // action !== prevAction check never fires — reset animTimer explicitly
+    // or the sprite frame stays pinned wherever it was.
     this.animTimer = 0;
     this.moveTimer = PLAYER_SLIDE_DURATION;
     this.vx = this.facing * PLAYER_SLIDE_SPEED;
     this.attackHit = false;
     this.attackHitCount = 0;
     this.lastHitTick = -999;
+    this.slideBuffer = 0;
   }
 
   // Called for every hit this player lands or receives. Weight is
@@ -805,9 +834,16 @@ class Player {
     this.y = clamp(this.y, bounds.top, bounds.bottom);
 
     if (this.moveTimer === 0 && this.action === 'slide') {
-      this.action = 'idle';
-      this.vx = 0;
+      // A press made during the roll chains straight into the next one, so
+      // a held or mashed button reads as one continuous roll.
+      if (this.slideBuffer > 0 && this.hitStun === 0) {
+        this.beginSlide();
+      } else {
+        this.action = 'idle';
+        this.vx = 0;
+      }
     }
+    if (this.slideBuffer > 0) this.slideBuffer--;
 
     if (this.invuln > 0) this.invuln--;
     // The kill chain lapses on its own; addScore() restarts it.

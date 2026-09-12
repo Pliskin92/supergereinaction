@@ -88,6 +88,22 @@ jobs:
       - name: Regenerate sprite trim data
         run: python3 scripts/build-sprite-trim.py
 
+      # The sprite manifest lists which clip folders exist. A commit that
+      # adds art without regenerating it means the new clip is never
+      # requested -- it simply does not appear in game, with no error. Same
+      # regenerate-and-diff check as the trim data above.
+      - name: Regenerate sprite manifest
+        run: python3 scripts/build-sprite-manifest.py
+
+      - name: Fail if the sprite manifest was out of date
+        run: |
+          if ! git diff --quiet -- web/js/sprite-manifest.js; then
+            echo "::error::sprite-manifest.js is stale. Run 'python3 scripts/build-sprite-manifest.py' and commit the result."
+            git diff -- web/js/sprite-manifest.js
+            exit 1
+          fi
+          echo "Sprite manifest is up to date."
+
       - name: Fail if trim data was out of date
         run: |
           if ! git diff --quiet -- '**/trim.json'; then

@@ -153,11 +153,32 @@ function loadSpriteSheet(character, action, dir) {
   });
 }
 
+// Whether a clip folder actually exists on disk.
+//
+// The manifest is generated from the art itself
+// (scripts/build-sprite-manifest.py). Consulting it means a clip that was
+// never drawn costs nothing, instead of a request that 404s -- which is
+// free on localhost and emphatically not over a network: the deployed game
+// spent 120 of its 441 requests on misses, at roughly 1.3 seconds each,
+// with the loading gate waiting on every one.
+//
+// Falls back to "try it and see" when the manifest is absent, so the game
+// still works if the file has not been generated.
+function spriteClipExists(character, dir) {
+  if (typeof SpriteManifest === 'undefined') return true;
+  const clips = SpriteManifest[character];
+  if (!clips) return false;
+  // `dir` is '<character>_sprites/<clip>'; the manifest keys on the clip.
+  const clip = dir.slice(dir.indexOf('/') + 1);
+  return clips.includes(clip);
+}
+
 function loadAssets() {
   const sheetPromises = [];
   const packs = { ...CharacterSpriteSheets, ...PropSpriteSheets };
   for (const [character, actions] of Object.entries(packs)) {
     for (const [action, dir] of Object.entries(actions)) {
+      if (!spriteClipExists(character, dir)) continue;
       sheetPromises.push(loadSpriteSheet(character, action, dir));
     }
   }
