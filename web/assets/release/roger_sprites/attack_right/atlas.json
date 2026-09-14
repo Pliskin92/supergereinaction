@@ -507,8 +507,8 @@
   "image": "spritesheet.png",
   "format": "RGBA8888",
   "size": {
-   "w": 1280,
-   "h": 1280
+   "w": 800,
+   "h": 800
   },
   "scale": "1"
  }

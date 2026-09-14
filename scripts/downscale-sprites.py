@@ -97,6 +97,12 @@ def downscale_clip(clip_dir, scale, dry_run):
         else:
             atlas['frames'][key] = scale_box(frame, scale)
     meta = atlas.setdefault('meta', {})
+    # The sheet's own dimensions, which must follow the image or the
+    # metadata quietly describes a file that no longer exists. Nothing in
+    # the web game reads this, which is why it was missed the first time --
+    # and why it matters now that a Godot importer will trust it.
+    if 'size' in meta:
+        meta['size'] = {'w': new_size[0], 'h': new_size[1]}
     if 'frame_size' in meta:
         meta['frame_size'] = {
             'w': max(1, int(meta['frame_size']['w'] * scale)),

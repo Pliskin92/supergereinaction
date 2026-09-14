@@ -17,3 +17,5 @@ frames/
 godot/.godot/
 godot/android/
 godot/export_presets.cfg
+# Per-frame PNG dumps live beside the sheets in the Godot assets too.
+godot/assets/**/frames/
