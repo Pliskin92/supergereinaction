@@ -1,21 +1,17 @@
-node_modules/
-.lint-bundle/
 *.log
-.env
-
-# AutoSprite exports each clip's individual PNG frames alongside the packed
-# spritesheet. Only the spritesheet + atlas are used at runtime, so the
-# per-frame dumps are working files, not shipped assets.
-frames/
-
-# Headless Playwright harnesses used to drive and screenshot the game while
-# developing. Working files, not part of the shipped site.
-.devtools/
 
 # Godot's import cache and editor-local state. Regenerated from the project
 # on any machine, so it is build output rather than source.
 godot/.godot/
 godot/android/
 godot/export_presets.cfg
-# Per-frame PNG dumps live beside the sheets in the Godot assets too.
+
+# AutoSprite exports each clip's individual PNG frames alongside the packed
+# spritesheet. Only the spritesheet and its atlas are used at runtime, so
+# the per-frame dumps are working files, not shipped assets.
 godot/assets/**/frames/
+
+# Source art and working files for art that is not in the game yet --
+# concepts, comic sources, unused packs. Never committed: these are large,
+# and only finished exports belong in godot/assets. See ART-TODO.md.
+art-source/

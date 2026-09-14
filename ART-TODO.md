@@ -14,15 +14,15 @@ whole way.
 ## 1. Level backgrounds — the biggest visual win
 
 Levels 2–6 all draw level 1's street (`PLACEHOLDER_STREET` in
-`web/js/campaign.js`). Each needs one **horizontally tileable strip**.
+`godot/scripts/campaign.gd`). Each needs one **horizontally tileable strip**.
 
 | Level | Setting | File to create |
 |---|---|---|
-| 2 | Grandpa Gastone's garage | `web/assets/release/backgrounds/lv2/lv2-background.png` |
-| 3 | Uncle Mattia's workshop | `web/assets/release/backgrounds/lv3/lv3-background.png` |
-| 4 | Uncle Michele's yard | `web/assets/release/backgrounds/lv4/lv4-background.png` |
-| 5 | Boss Luigi's approach | `web/assets/release/backgrounds/lv5/lv5-background.png` |
-| 6 | The final rescue | `web/assets/release/backgrounds/lv6/lv6-background.png` |
+| 2 | Grandpa Gastone's garage | `godot/assets/backgrounds/lv2/lv2-background.png` |
+| 3 | Uncle Mattia's workshop | `godot/assets/backgrounds/lv3/lv3-background.png` |
+| 4 | Uncle Michele's yard | `godot/assets/backgrounds/lv4/lv4-background.png` |
+| 5 | Boss Luigi's approach | `godot/assets/backgrounds/lv5/lv5-background.png` |
+| 6 | The final rescue | `godot/assets/backgrounds/lv6/lv6-background.png` |
 
 **Requirements**, matching `lv1-background.png` (1855×387):
 
@@ -34,7 +34,7 @@ Levels 2–6 all draw level 1's street (`PLACEHOLDER_STREET` in
   world visible at once.
 - There must be a clear, flat **walkable band** — the pavement in level 1.
 
-**To install one**, edit that level's row in `web/js/campaign.js`:
+**To install one**, edit that level's row in `godot/scripts/campaign.gd`:
 
 ```js
 {
@@ -55,7 +55,7 @@ to be measured rather than guessed.
 
 ## 2. Level title-card splashes (optional, high impact)
 
-Each level opens on a title card (`web/js/level-card.js`). With no art it
+Each level opens on a title card (`godot/scripts/level-card.gd`). With no art it
 draws a dark card with speed lines — which looks fine. Give a level an
 `art:` path and that image becomes the backdrop, which is the natural place
 for a **comic panel** establishing each location.
@@ -70,10 +70,10 @@ Any size; it is scaled to cover the canvas and dimmed behind the type.
 
 Levels 2–6 all use `boss1`, so every boss fight is the same character. Each
 new boss needs a sprite pack at
-`web/assets/release/<name>_sprites/<clip>/{spritesheet.png,atlas.json}`
+`godot/assets/<name>_sprites/<clip>/{spritesheet.png,atlas.json}`
 with, at minimum: `idle_right`, `walk_right`, `punch`, `fall`.
 
-Then add an entry to `EnemyTypes` in `web/js/entities.js` (copy `boss1` and
+Then add an entry to `EnemyTypes` in `godot/scripts/entities.gd` (copy `boss1` and
 change the numbers — it is the fullest example) and point the level's
 `boss:` at it. The README names **Boss Luigi** for level 5 and
 **Mario, Wario & Bowser** for level 6.
@@ -87,21 +87,21 @@ Same sprite-pack layout as above.
 
 ## 5. Assist sprites (Mattia, Michele)
 
-Rescuing them unlocks them as summonable assists (`web/js/assist.js`).
+Rescuing them unlocks them as summonable assists (`godot/scripts/assist.gd`).
 Neither has a pack, so both currently appear as coloured vector figures that
-walk and punch. A pack at `web/assets/release/<name>_sprites/` with
+walk and punch. A pack at `godot/assets/<name>_sprites/` with
 `idle_right`, `walk_right` and `punch` makes them appear as themselves — no
 code change, the lookup already tries those clips and falls back.
 
 ## 6. Shop backdrops — done
 
-All five shop backdrops are shipped (`web/assets/release/shops/`) and wired
-to their levels via `shopArt` in `web/js/campaign.js`. Nothing to do here
+All five shop backdrops are shipped (`godot/assets/shops/`) and wired
+to their levels via `shopArt` in `godot/scripts/campaign.gd`. Nothing to do here
 unless you want to redraw them.
 
 ## 7. Rescue characters
 
-Each level now ends with a story scene (`web/js/interlude.js`) in which the
+Each level now ends with a story scene (`godot/scripts/interlude.gd`) in which the
 rescued relative speaks. `carla` and `roger` have packs and appear as
 themselves; `gastone`, `mattia` and `michele` fall back to a coloured vector
 figure.
