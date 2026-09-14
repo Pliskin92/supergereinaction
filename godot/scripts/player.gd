@@ -67,12 +67,6 @@ func setup(library: SpriteLibrary, character := "gere") -> void:
 func _physics_process(delta: float) -> void:
 	if state == State.DEAD:
 		return
-	if _invuln > 0.0:
-		_invuln -= delta
-	if _combo_timer > 0.0:
-		_combo_timer -= delta
-		if _combo_timer <= 0.0:
-			_combo_step = 0
 	_tick_state(delta)
 	_apply_facing()
 
@@ -81,6 +75,18 @@ func _physics_process(delta: float) -> void:
 # not per frame: the web version moved per frame, which tied its feel to the
 # frame rate.
 func _tick_state(delta: float) -> void:
+	# The timers live here rather than in _physics_process so that anything
+	# driving the player frame by frame -- a test, a replay, a simulated
+	# fight -- advances them too. Keeping them in _physics_process meant the
+	# combo window never lapsed under test, so the combo could never reach
+	# its third step and the kick was unreachable outside a real run.
+	if _invuln > 0.0:
+		_invuln -= delta
+	if _combo_timer > 0.0:
+		_combo_timer -= delta
+		if _combo_timer <= 0.0:
+			_combo_step = 0
+
 	match state:
 		State.IDLE, State.WALK, State.RUN:
 			_move_free(delta)

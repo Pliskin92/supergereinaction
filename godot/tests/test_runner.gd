@@ -43,6 +43,8 @@ func _run_all() -> void:
 		"res://tests/test_game_state.gd",
 		"res://tests/test_sprite_library.gd",
 		"res://tests/test_player.gd",
+		"res://tests/test_enemy.gd",
+		"res://tests/test_combat.gd",
 	]
 	for path in suites:
 		# ResourceLoader rather than load(): a suite with a parse error makes
