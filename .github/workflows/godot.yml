@@ -1,0 +1,48 @@
+# Runs the Godot test suite on every push.
+#
+# The whole point of the rewrite is ground that can be shown to be stable
+# rather than hoped to be, so the tests gate the branch from the first
+# commit rather than being added once there is something to test.
+
+name: Godot
+
+on:
+  push:
+    branches: ['**']
+    paths:
+      - 'godot/**'
+      - '.github/workflows/godot.yml'
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test suite
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Godot
+        run: |
+          set -euo pipefail
+          # Pinned: an engine that changes under the tests would turn a green
+          # suite red for reasons that have nothing to do with the game.
+          VERSION=4.3-stable
+          FILE=Godot_v${VERSION}_linux.x86_64
+          curl -sL -o godot.zip \
+            "https://github.com/godotengine/godot/releases/download/${VERSION}/${FILE}.zip"
+          unzip -q godot.zip
+          sudo install -m755 "$FILE" /usr/local/bin/godot4
+          godot4 --headless --version
+
+      # class_name registration and the resource cache are built on import.
+      # Without this the suites fail to resolve Config and the run is a wall
+      # of parse errors -- which is exactly what happened the first time.
+      - name: Import project
+        run: godot4 --headless --path godot --import || true
+
+      - name: Run tests
+        run: godot4 --headless --path godot --script tests/test_runner.gd
