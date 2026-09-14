@@ -17,6 +17,8 @@ extends SceneTree
 var _passed := 0
 var _failed := 0
 var _current := ""
+# Set by t.finished() at the end of a suite; see _run_all for why.
+var _suite_finished := false
 
 
 func _init() -> void:
@@ -45,6 +47,7 @@ func _run_all() -> void:
 		"res://tests/test_player.gd",
 		"res://tests/test_enemy.gd",
 		"res://tests/test_combat.gd",
+		"res://tests/test_encounter.gd",
 	]
 	for path in suites:
 		# ResourceLoader rather than load(): a suite with a parse error makes
@@ -66,7 +69,22 @@ func _run_all() -> void:
 		if not suite.has_method("run"):
 			_fail_hard("%s has no run()" % path)
 			continue
+		# A suite that dies partway -- a nonexistent method, a null access --
+		# stops running without raising anything this loop can catch, and the
+		# runner would then report PASSED on however many assertions happened
+		# to have run before it fell over. That is the same blind spot as a
+		# suite failing to compile, and it has now been hit twice.
+		#
+		# So a suite must SAY it finished. run() sets this flag as its last
+		# act, via t.finished(); if it never gets there, the suite is counted
+		# as failed whatever its assertions said.
+		_suite_finished = false
 		suite.run(self)
+		if not _suite_finished:
+			_fail_hard(
+				"%s stopped partway -- an error inside it killed the suite"
+				% path.get_file()
+			)
 
 
 func _fail_hard(message: String) -> void:
@@ -82,6 +100,12 @@ func describe(name: String) -> void:
 	_current = name
 	print("")
 	print("%s" % name)
+
+
+# Called by a suite as its final statement, to prove it ran to the end
+# rather than dying partway through.
+func finished() -> void:
+	_suite_finished = true
 
 
 func check(condition: bool, message: String) -> void:

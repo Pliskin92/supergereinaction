@@ -140,3 +140,5 @@ func run(t) -> void:
 		(e2.max_hp - e2.hp) > normal_damage,
 		"a transformed punch takes more off the boss"
 	)
+
+	t.finished()

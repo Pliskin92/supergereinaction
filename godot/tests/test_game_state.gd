@@ -73,3 +73,5 @@ func run(t) -> void:
 	state.reset_run()
 	t.equal(state.lives, Config.lives_for("easy"), "easy starts with its own count")
 	t.check(state.lives > 0, "every difficulty starts playable")
+
+	t.finished()

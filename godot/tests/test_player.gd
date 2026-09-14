@@ -196,3 +196,5 @@ func run(t) -> void:
 		p.bounds.has_point(p.position),
 		"a player outside the walkable band is pulled back into it"
 	)
+
+	t.finished()

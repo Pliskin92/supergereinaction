@@ -181,3 +181,5 @@ func run(t) -> void:
 	var b := _make("boss1")
 	t.check(b.is_boss(), "it knows it is a boss")
 	t.check(b.hp > _make("minion").hp, "and has the health to prove it")
+
+	t.finished()

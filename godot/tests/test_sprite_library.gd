@@ -119,3 +119,5 @@ func run(t) -> void:
 			"%s loads at least one of its gameplay clips (%d of %d)"
 				% [character, got.size(), clips.size()]
 		)
+
+	t.finished()

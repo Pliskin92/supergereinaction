@@ -79,3 +79,5 @@ func run(t) -> void:
 		Config.lives_for(Config.DEFAULT_DIFFICULTY),
 		"an empty difficulty falls back too"
 	)
+
+	t.finished()
