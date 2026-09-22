@@ -82,14 +82,39 @@ fight found it. Level pacing gets the same treatment.
 
 **242 assertions**, green in CI.
 
+## Building for Android
+
+The export preset is a template, because Godot rewrites the real one with
+machine-local paths and can end up holding the keystore password:
+
+```bash
+cp godot/export_presets.cfg.template godot/export_presets.cfg
+```
+
+Then, once only, in the editor:
+
+- **Editor → Manage Export Templates** — download them
+- **Project → Install Android Build Template**
+- **Editor Settings → Export → Android** — point at a JDK 17 and the SDK
+- **Project → Export → Android** — set a release keystore and its passwords
+  there, never in a committed file
+
+Then **Project → Export**, or from the command line:
+
+```bash
+godot4 --headless --path godot --export-release Android build/super-gere.apk
+```
+
 ## State
 
-Playable in the editor: a street that scrolls, a player who moves and
-fights, enemies that arrive in packs and lock the street, a boss at the
-end.
+Playable: title screen with options, a street that scrolls, a player who
+moves and fights, enemies that arrive in packs and lock the street, a boss
+at the end, a score, and a summary that carries the run to the next level.
+Six levels chain to the end of the campaign. Touch controls on a
+touchscreen; keyboard everywhere else.
 
-Not yet: HUD, title screen, end-of-level flow, the story scenes, the shop,
-the lock code, touch controls, APK export.
+Not yet: the story scenes, the shop, the assists, the lock code, and a
+highscore table.
 
 Levels 2-6 run on the same engine and share level 1's street art and boss.
 See [ART-TODO.md](ART-TODO.md).
