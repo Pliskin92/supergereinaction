@@ -38,6 +38,11 @@ var _player: Player
 var _enemies: Array[Enemy] = []
 var _boss: Enemy
 var _camera: Camera2D
+var _hud: Hud
+# The running score for this level, and the kill chain that multiplies it.
+var score := 0
+var chain := 0
+var _chain_timer := 0.0
 var _background_layer: Node2D
 var _texture: Texture2D
 var _strip_width := 0.0
@@ -50,6 +55,7 @@ func _ready() -> void:
 	_build_player()
 	_director.setup(level_def, world_width, Config.VIEW_WIDTH)
 	_build_camera()
+	_build_hud()
 	if OS.get_environment("SG_CAPTURE") != "":
 		_capture()
 
@@ -111,12 +117,26 @@ func _build_camera() -> void:
 	_camera.make_current()
 
 
+func _build_hud() -> void:
+	_hud = Hud.new()
+	_hud.player = _player
+	_hud.level_title = level_def.get("title_key", "")
+	add_child(_hud)
+
+
 # Walks the player and captures frames, so a headless run can show whether
 # the street actually works. Scaffolding; removed once there is a HUD and a
 # person can just play it.
 func _capture() -> void:
 	var base: String = OS.get_environment("SG_CAPTURE")
 	var shot := 0
+	# Put the HUD into a state worth photographing: a chain running, the
+	# meter part full, a life spent.
+	score = 4820
+	chain = 3
+	_player.fury = Config.FURY_MAX * 0.65
+	_player.hp = int(_player.max_hp * 0.55)
+	_player.lives = maxi(1, GameState.lives - 1)
 	for step in 12:
 		# Walk right for a while, punching.
 		for i in 90:
@@ -159,8 +179,26 @@ func _physics_process(delta: float) -> void:
 	for enemy in _enemies:
 		enemy.tick(delta, _player.position)
 
-	Combat.resolve_player_attack(_player, _enemies)
+	# A kill is worth more the longer the chain, so clearing a pack without
+	# pausing beats picking them off. The chain lapses on its own.
+	if _chain_timer > 0.0:
+		_chain_timer -= delta
+		if _chain_timer <= 0.0:
+			chain = 0
+
+	var struck := Combat.resolve_player_attack(_player, _enemies)
+	if struck != null:
+		# Landing a blow feeds the meter, whether or not it killed.
+		_player.add_fury(Config.FURY_PER_HIT)
+		if not struck.is_alive() and not struck.has_meta("scored"):
+			# Latched, so a body that lingers pays out exactly once.
+			struck.set_meta("scored", true)
+			chain += 1
+			_chain_timer = Config.SCORE_COMBO_WINDOW
+			score += Scoring.kill_value(struck.def.get("score", 0), chain)
 	Combat.resolve_enemy_attacks(_enemies, _player)
+	if _hud != null:
+		_hud.score = score
 
 	_retire_dead()
 	_run_director()
@@ -240,6 +278,8 @@ func _spawn_boss() -> void:
 	_boss.position = Vector2(_director.boss_x(), bounds.get_center().y)
 	add_child(_boss)
 	_enemies.append(_boss)
+	if _hud != null:
+		_hud.boss = _boss
 
 
 func _update_camera() -> void:
@@ -263,9 +303,15 @@ func _sort_by_depth() -> void:
 
 
 func _check_clear() -> void:
-	if _player.state == Player.State.DEAD and _player.lives <= 0:
-		cleared = true
-		player_died.emit()
+	if _player.state == Player.State.DEAD:
+		if _player.lives > 0:
+			# A life is spent, not the run: back on their feet where they
+			# fell, with a moment of invulnerability to get clear.
+			_player.respawn()
+			GameState.lives = _player.lives
+		else:
+			cleared = true
+			player_died.emit()
 		return
 	# The level ends when the boss is down -- not when the roster is spent,
 	# so a player who runs past a fight still has to beat him.
