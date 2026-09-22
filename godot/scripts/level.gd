@@ -56,70 +56,10 @@ func _ready() -> void:
 	_director.setup(level_def, world_width, Config.VIEW_WIDTH)
 	_build_camera()
 	_build_hud()
-
-
-# Lays the strip down `loops` times and works out the world from the art's
-# own proportions, so changing the background changes the level.
-func _build_background() -> void:
-	_background_layer = Node2D.new()
-	add_child(_background_layer)
-	var path: String = level_def.get("background", "")
-	if not ResourceLoader.exists(path):
-		push_warning("level %s has no background at %s" % [level_def.get("id"), path])
-		world_width = Config.VIEW_WIDTH * 6
-		bounds = Rect2(40, 360, world_width - 80, 100)
-		return
-	_texture = load(path)
-
-	# Scale the strip to fill the viewport height; the world is then however
-	# wide that makes it, times the loop count.
-	var scale_factor := float(Config.VIEW_HEIGHT) / float(_texture.get_height())
-	_strip_width = _texture.get_width() * scale_factor
-	var loops: int = level_def.get("loops", 6)
-	world_width = _strip_width * loops
-
-	for i in loops:
-		var sprite := Sprite2D.new()
-		sprite.texture = _texture
-		sprite.centered = false
-		sprite.scale = Vector2(scale_factor, scale_factor)
-		sprite.position = Vector2(i * _strip_width, 0)
-		sprite.z_index = -100
-		_background_layer.add_child(sprite)
-
-	var top := WALK_TOP * Config.VIEW_HEIGHT
-	var bottom := WALK_BOTTOM * Config.VIEW_HEIGHT
-	var inset := (bottom - top) * EDGE_INSET
-	bounds = Rect2(40, top + inset, world_width - 80, (bottom - top) - inset * 2.0)
-
-
-func _build_player() -> void:
-	_player = Player.new()
-	_player.setup(_library, "gere")
-	_player.bounds = bounds
-	_player.position = Vector2(140, bounds.get_center().y)
-	# The run carries these; a fresh run starts at the difficulty's defaults.
-	_player.lives = GameState.lives
-	_player.max_hp = GameState.max_hp
-	_player.hp = GameState.max_hp
-	add_child(_player)
-
-
-# Follows the player but never scrolls past either end of the world, and
-# freezes at the lock while a fight is on -- the arena a fight happens in
-# should stay put rather than sliding as the player moves within it.
-func _build_camera() -> void:
-	_camera = Camera2D.new()
-	_camera.position = Vector2(Config.VIEW_WIDTH / 2.0, Config.VIEW_HEIGHT / 2.0)
-	add_child(_camera)
-	_camera.make_current()
-
-
-func _build_hud() -> void:
-	_hud = Hud.new()
-	_hud.player = _player
-	_hud.level_title = level_def.get("title_key", "")
-	add_child(_hud)
+	# Only on a touchscreen: a desktop should not lose a corner of its
+	# screen to thumb buttons.
+	if TouchPad.wanted():
+		add_child(TouchPad.new())
 
 
 func _unhandled_input(event: InputEvent) -> void:

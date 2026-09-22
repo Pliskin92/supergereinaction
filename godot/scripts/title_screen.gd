@@ -35,6 +35,8 @@ func _ready() -> void:
 	_canvas.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_canvas.draw.connect(_draw_title)
 	add_child(_canvas)
+	if TouchPad.wanted():
+		add_child(TouchPad.new())
 
 
 func _process(delta: float) -> void:
