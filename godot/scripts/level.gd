@@ -56,8 +56,6 @@ func _ready() -> void:
 	_director.setup(level_def, world_width, Config.VIEW_WIDTH)
 	_build_camera()
 	_build_hud()
-	if OS.get_environment("SG_CAPTURE") != "":
-		_capture()
 
 
 # Lays the strip down `loops` times and works out the world from the art's
@@ -122,42 +120,6 @@ func _build_hud() -> void:
 	_hud.player = _player
 	_hud.level_title = level_def.get("title_key", "")
 	add_child(_hud)
-
-
-# Walks the player and captures frames, so a headless run can show whether
-# the street actually works. Scaffolding; removed once there is a HUD and a
-# person can just play it.
-func _capture() -> void:
-	var base: String = OS.get_environment("SG_CAPTURE")
-	var shot := 0
-	# Put the HUD into a state worth photographing: a chain running, the
-	# meter part full, a life spent.
-	score = 4820
-	chain = 3
-	_player.fury = Config.FURY_MAX * 0.65
-	_player.hp = int(_player.max_hp * 0.55)
-	_player.lives = maxi(1, GameState.lives - 1)
-	for step in 12:
-		# Walk right for a while, punching.
-		for i in 90:
-			_player.position.x += Config.RUN_SPEED * (1.0 / 60.0)
-			await get_tree().physics_frame
-		if _enemies.size() > 0:
-			_player.handle_action("punch")
-			for i in 30:
-				await get_tree().physics_frame
-			await get_tree().process_frame
-			get_viewport().get_texture().get_image().save_png(
-				"%s-%02d.png" % [base, shot])
-			print("  shot %d: x=%.0f enemies=%d locked=%s" % [
-				shot, _player.position.x, _enemies.size(),
-				str(_director.lock_x > 0.0)])
-			shot += 1
-			if shot >= 3:
-				break
-	print("  spawned=%d of roster=%d, encounters=%d" % [
-		_director.spawned, _director.roster, _director.encounters])
-	get_tree().quit()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -311,10 +273,53 @@ func _check_clear() -> void:
 			GameState.lives = _player.lives
 		else:
 			cleared = true
+			_show_summary(true)
 			player_died.emit()
 		return
 	# The level ends when the boss is down -- not when the roster is spent,
 	# so a player who runs past a fight still has to beat him.
 	if _boss != null and not _boss.is_alive() and _boss.gone:
 		cleared = true
+		_show_summary(false)
 		level_cleared.emit(elapsed)
+
+
+# The end-of-level screen, and what happens after it.
+func _show_summary(died: bool) -> void:
+	var is_final := Campaign.is_final(level_index)
+	# A run that ended in death is not a finished level: it keeps the points
+	# it fought for and earns no bonuses. Passing the real elapsed time here
+	# paid a time bonus for dying quickly, which is the wrong incentive and
+	# was visibly wrong on screen -- 7400 earned, 13375 shown.
+	var summary: Dictionary
+	if died:
+		summary = {
+			"earned": score, "seconds": elapsed, "time_bonus": 0,
+			"lives_bonus": 0, "total": score, "is_final": false,
+		}
+	else:
+		summary = Scoring.summarise(score, elapsed, _player.lives, is_final)
+	var screen := LevelSummary.new()
+	screen.summary = summary
+	screen.is_game_over = died
+	if not died:
+		screen.rescue = level_def.get("rescue", "")
+		if not is_final:
+			screen.next_title = Campaign.get_level(level_index + 1).get("title_key", "")
+	screen.continued.connect(_on_summary_continued.bind(died, summary, is_final))
+	add_child(screen)
+
+
+func _on_summary_continued(died: bool, summary: Dictionary, is_final: bool) -> void:
+	if died:
+		# A spent run starts again from the first level, rather than
+		# resuming into the one that beat it.
+		GameState.reset_run()
+		get_tree().reload_current_scene()
+		return
+	GameState.complete_level(
+		summary.get("total", 0), _player.lives, level_def.get("rescue", "")
+	)
+	if is_final:
+		GameState.reset_run()
+	get_tree().reload_current_scene()

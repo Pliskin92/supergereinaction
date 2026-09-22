@@ -267,7 +267,10 @@ func take_damage(amount: int, from_x: float) -> void:
 
 func _die() -> void:
 	state = State.DEAD
-	lives -= 1
+	# Floored at zero: a life count is a count, and a negative one leaks
+	# into the HUD (which draws a heart per life) and into any check
+	# written as `lives > 0`.
+	lives = maxi(0, lives - 1)
 	_play("fall")
 	died.emit()
 

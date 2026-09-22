@@ -149,6 +149,19 @@ func run(t) -> void:
 	t.equal(p.hp, Config.MAX_HP, "respawning restores health")
 	t.equal(p.state, Player.State.IDLE, "and puts the player back on their feet")
 
+	t.describe("Player — lives never go negative")
+	# A life count is a count. A negative one leaks into the HUD, which
+	# draws a heart per life, and into every check written as `lives > 0`.
+	p = _make()
+	p.lives = 1
+	p.take_damage(Config.MAX_HP, 0.0)
+	t.equal(p.lives, 0, "the last life brings the count to zero")
+	p.hp = Config.MAX_HP
+	p.state = Player.State.IDLE
+	p._invuln = 0.0
+	p.take_damage(Config.MAX_HP, 0.0)
+	t.equal(p.lives, 0, "and dying again cannot take it below zero")
+
 	t.describe("Player — one swing lands once")
 	p = _make()
 	p.handle_action("punch")

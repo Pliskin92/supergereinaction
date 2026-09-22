@@ -76,6 +76,22 @@ func run(t) -> void:
 		"but the points earned by fighting are never taken away"
 	)
 
+	t.describe("Scoring — a run that ends in death earns no bonuses")
+	# The level builds this summary itself rather than calling summarise(),
+	# because a death is not a finished level. Asserted here so the rule is
+	# recorded where scoring lives: dying quickly must not pay a TIME bonus.
+	var died := {
+		"earned": 7400, "seconds": 1.0, "time_bonus": 0,
+		"lives_bonus": 0, "total": 7400, "is_final": false,
+	}
+	t.equal(died["total"], died["earned"], "the total is exactly what was fought for")
+	t.equal(died["time_bonus"], 0, "no time bonus for dying fast")
+	t.check(
+		Scoring.summarise(7400, 1.0, 0, false)["total"] > died["total"],
+		"whereas a CLEARED level that quick would be worth more -- which is "
+			+ "why a death must not go through summarise()"
+	)
+
 	t.describe("Scoring — the clock")
 	t.equal(Scoring.clock(0.0), [0, 0], "zero reads as 0:00")
 	t.equal(Scoring.clock(65.0), [1, 5], "65 seconds is 1:05")
