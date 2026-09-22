@@ -41,10 +41,19 @@ gradle_build/compress_native_libraries=false
 gradle_build/export_format=0
 gradle_build/min_sdk=""
 gradle_build/target_sdk=""
+; arm64-v8a is what ships: every Android device sold for years is arm64,
+; and adding armeabi-v7a roughly doubles the bundle for hardware this is
+; not aimed at.
+;
+; x86_64 is enabled for TESTING. An Android VM (Android-x86, BlissOS, the
+; emulator) is x86_64, and an arm64-only APK refuses to install there with
+; INSTALL_FAILED_NO_MATCHING_ABIS. It costs bundle size, so turn it off
+; before building the AAB you upload to Play -- Play splits per
+; architecture anyway, so it is only dead weight in a test APK.
 architectures/armeabi-v7a=false
 architectures/arm64-v8a=true
 architectures/x86=false
-architectures/x86_64=false
+architectures/x86_64=true
 version/code=1
 version/name="1.0"
 package/unique_name="com.parise.supergere"
