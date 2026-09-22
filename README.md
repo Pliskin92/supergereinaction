@@ -80,7 +80,7 @@ every unit test while being completely deadlocked — each part correct, the
 combination unplayable — and only walking a virtual player through a whole
 fight found it. Level pacing gets the same treatment.
 
-**242 assertions**, green in CI.
+**371 assertions**, green in CI.
 
 ## Building for Android
 
