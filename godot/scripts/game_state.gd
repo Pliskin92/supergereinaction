@@ -75,6 +75,7 @@ func run_complete(level_count: int) -> bool:
 # schema kept in sync by hand.
 func save_settings() -> void:
 	var file := ConfigFile.new()
+	Strings.set_language(language)
 	file.set_value("game", "language", language)
 	file.set_value("game", "difficulty", difficulty)
 	# A failed save is not worth interrupting play for: the settings simply
@@ -94,3 +95,6 @@ func load_settings() -> void:
 	# the run into a difficulty that no longer exists.
 	if Config.DIFFICULTIES.has(stored):
 		difficulty = stored
+	# The string table holds its own language so it can be used without the
+	# scene tree; keep the two in step.
+	Strings.set_language(language)

@@ -10,7 +10,7 @@ config_version=5
 
 config/name="Super Gere: Parise Rescue"
 config/description="A 2D side-scrolling beat-em-up."
-run/main_scene="res://scenes/level.tscn"
+run/main_scene="res://scenes/title.tscn"
 config/features=PackedStringArray("4.3", "GL Compatibility")
 config/icon="res://icon.svg"
 

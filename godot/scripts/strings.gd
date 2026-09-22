@@ -12,6 +12,18 @@ extends RefCounted
 
 const TABLE := {
 	"it": {
+		"new_game": "NUOVA PARTITA",
+		"options": "OPZIONI",
+		"language": "Lingua",
+		"difficulty": "Difficolta",
+		"language_it": "Italiano",
+		"language_en": "English",
+		"difficulty_easy": "FACILE",
+		"difficulty_medium": "NORMALE",
+		"difficulty_hard": "DIFFICILE",
+		"difficulty_hell": "INFERNO",
+		"menu_hint": "FRECCE + INVIO",
+		"options_hint": "FRECCE CAMBIA \u00b7 INVIO INDIETRO",
 		"level1_title": "LIVELLO 1 — LA STRADA",
 		"level2_title": "LIVELLO 2 — IL GARAGE DI GASTONE",
 		"level3_title": "LIVELLO 3 — IL LABORATORIO DI MATTIA",
@@ -38,6 +50,18 @@ const TABLE := {
 		"rescue_family": "TUTTA LA FAMIGLIA",
 	},
 	"en": {
+		"new_game": "NEW GAME",
+		"options": "OPTIONS",
+		"language": "Language",
+		"difficulty": "Difficulty",
+		"language_it": "Italiano",
+		"language_en": "English",
+		"difficulty_easy": "EASY",
+		"difficulty_medium": "MEDIUM",
+		"difficulty_hard": "HARD",
+		"difficulty_hell": "HELL",
+		"menu_hint": "ARROWS + ENTER",
+		"options_hint": "ARROWS CHANGE \u00b7 ENTER BACK",
 		"level1_title": "LEVEL 1 — THE STREET",
 		"level2_title": "LEVEL 2 — GASTONE'S GARAGE",
 		"level3_title": "LEVEL 3 — MATTIA'S WORKSHOP",
@@ -73,8 +97,20 @@ const DEFAULT_LANGUAGE := "it"
 # Falls back to the default language, then to the key itself. Showing the
 # key is deliberate: a missing string is then obvious on screen during
 # development rather than silently blank.
+# The language to look up in. Held here rather than read from the GameState
+# autoload, because an autoload does not exist in a --script run and a
+# string table that cannot be used without a full scene tree is a string
+# table that cannot be tested. GameState sets it when it loads settings.
+static var language := DEFAULT_LANGUAGE
+
+
+static func set_language(value: String) -> void:
+	if TABLE.has(value):
+		language = value
+
+
 static func get_text(key: String) -> String:
-	var language: String = GameState.language if GameState != null else DEFAULT_LANGUAGE
+	var language: String = Strings.language
 	if not TABLE.has(language):
 		language = DEFAULT_LANGUAGE
 	var table: Dictionary = TABLE[language]
